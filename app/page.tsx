@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Image from "next/image"
+import Link from "next/link"
 import { useTheme } from "next-themes"
 import { useRouter } from "next/navigation"
 import {
@@ -226,13 +227,13 @@ export default function HomePage() {
             </form>
 
             <div className="mt-4 border-t border-border/60 pt-3 text-center">
-              <a
+              <Link
                 href="/officer/login"
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
               >
                 <span>Sales Officer? Sign In to Officer Portal</span>
                 <ArrowRight className="size-3" />
-              </a>
+              </Link>
             </div>
           </CardContent>
         </Card>

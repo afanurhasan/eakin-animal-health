@@ -42,7 +42,7 @@ import {
   type Product,
 } from "@/lib/mock-data"
 
-export default function OfficerOrdersPage() {
+function OfficerOrdersContent() {
   const searchParams = useSearchParams()
   const autoOpenCreate = searchParams?.get("create") === "true" || searchParams?.get("action") === "new"
 
@@ -1348,3 +1348,18 @@ export default function OfficerOrdersPage() {
     </div>
   )
 }
+
+export default function OfficerOrdersPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="flex h-96 items-center justify-center">
+          <p className="text-sm text-muted-foreground">Loading orders...</p>
+        </div>
+      }
+    >
+      <OfficerOrdersContent />
+    </React.Suspense>
+  )
+}
+
