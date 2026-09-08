@@ -26,12 +26,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAppState } from "@/lib/store"
 import {
-  initialCustomers,
-  initialOfficers,
-  initialAMs,
-  initialRMs,
-  initialAreasWithDepot,
   type CustomerItem,
   type SalesOfficerItem,
   type AMItem,
@@ -40,11 +36,16 @@ import {
 } from "@/lib/mock-data"
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = React.useState<CustomerItem[]>(initialCustomers)
-  const [officers] = React.useState<SalesOfficerItem[]>(initialOfficers)
-  const [ams] = React.useState<AMItem[]>(initialAMs)
-  const [rms] = React.useState<RMItem[]>(initialRMs)
-  const [areas] = React.useState<AreaItem[]>(initialAreasWithDepot)
+  const {
+    customers,
+    officers,
+    ams,
+    rms,
+    areas,
+    addCustomer,
+    updateCustomer,
+    deleteCustomer,
+  } = useAppState()
 
   // Filter States: Area, RM, AM, Officer, Search
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -328,34 +329,26 @@ export default function CustomersPage() {
     const officerName = assignedOfficer.name
 
     if (editingCustomer) {
-      setCustomers((prev) =>
-        prev.map((item) =>
-          item.id === editingCustomer.id
-            ? {
-                ...item,
-                code: formData.code.trim().toUpperCase(),
-                name: formData.name.trim(),
-                shopName: formData.shopName.trim(),
-                phone: formData.phone.trim(),
-                email: formData.email.trim() || undefined,
-                address: formData.address.trim(),
-                areaId: assignedOfficer.areaId,
-                areaName,
-                rmId: assignedOfficer.rmId,
-                rmName,
-                amId: assignedOfficer.amId,
-                amName,
-                officerId: assignedOfficer.id,
-                officerName,
-              }
-            : item
-        )
-      )
+      updateCustomer(editingCustomer.id, {
+        code: formData.code.trim().toUpperCase(),
+        name: formData.name.trim(),
+        shopName: formData.shopName.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim() || undefined,
+        address: formData.address.trim(),
+        areaId: assignedOfficer.areaId,
+        areaName,
+        rmId: assignedOfficer.rmId,
+        rmName,
+        amId: assignedOfficer.amId,
+        amName,
+        officerId: assignedOfficer.id,
+        officerName,
+      })
       setEditingCustomer(null)
       showToast("Customer details updated successfully.")
     } else {
-      const newCustomer: CustomerItem = {
-        id: `cust-${Date.now()}`,
+      addCustomer({
         code: formData.code.trim().toUpperCase() || `CUST-${String(customers.length + 1).padStart(3, "0")}`,
         name: formData.name.trim(),
         shopName: formData.shopName.trim(),
@@ -374,8 +367,7 @@ export default function CustomersPage() {
         outstandingBalance: 0,
         totalOrders: 0,
         totalSpent: 0,
-      }
-      setCustomers((prev) => [newCustomer, ...prev])
+      })
       setIsCreateOpen(false)
       showToast("New Customer added successfully.")
     }
@@ -386,7 +378,7 @@ export default function CustomersPage() {
   // Handle Delete
   const handleConfirmDelete = () => {
     if (!deletingCustomer) return
-    setCustomers((prev) => prev.filter((item) => item.id !== deletingCustomer.id))
+    deleteCustomer(deletingCustomer.id)
     setDeletingCustomer(null)
     showToast("Customer deleted successfully.")
   }

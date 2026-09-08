@@ -8,7 +8,6 @@ import {
   Eye,
   EyeOff,
   Lock,
-  Mail,
   Loader2,
   Moon,
   Sun,
@@ -16,6 +15,7 @@ import {
   Info,
   CheckCircle2,
   AlertCircle,
+  UserCheck,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -23,16 +23,18 @@ import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { useAppState } from "@/lib/store"
 
-export default function HomePage() {
+export default function OfficerLoginPage() {
   const router = useRouter()
-  const [email, setEmail] = React.useState("")
-  const [password, setPassword] = React.useState("")
+  const { loginOfficer } = useAppState()
+
+  const [identifier, setIdentifier] = React.useState("arafat@eakinhealth.com")
+  const [password, setPassword] = React.useState("officer123")
   const [showPassword, setShowPassword] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(false)
   const [notice, setNotice] = React.useState<{
@@ -53,23 +55,23 @@ export default function HomePage() {
     setNotice(null)
 
     setTimeout(() => {
-      if (
-        email.trim().toLowerCase() === "admin@gmail.com" &&
-        password === "admin1234"
-      ) {
+      const loggedIn = loginOfficer(identifier)
+      if (loggedIn) {
         setNotice({
           type: "success",
-          message: "Login successful! Redirecting to dashboard...",
+          message: `Welcome, ${loggedIn.name}! Redirecting to Officer Panel...`,
         })
-        router.push("/dashboard")
+        setTimeout(() => {
+          router.push("/officer/dashboard")
+        }, 500)
       } else {
         setIsLoading(false)
         setNotice({
           type: "error",
-          message: "Invalid credentials. Use admin@gmail.com and admin1234.",
+          message: "Invalid officer credentials. Enter a valid officer email or officer code.",
         })
       }
-    }, 600)
+    }, 500)
   }
 
   const toggleTheme = () => {
@@ -102,11 +104,11 @@ export default function HomePage() {
       </header>
 
       {/* Main Login Container */}
-      <main className="relative z-10 my-auto flex w-full max-w-[390px] flex-col items-center">
+      <main className="relative z-10 my-auto flex w-full max-w-[420px] flex-col items-center">
         {/* Card Component */}
         <Card className="w-full border-border/80 bg-card shadow-sm">
           {/* Card Header & Brand Logo Area */}
-          <CardHeader className="space-y-4 pb-4 text-center">
+          <CardHeader className="space-y-3 pb-3 text-center">
             <div className="mx-auto flex w-full max-w-[190px] items-center justify-center rounded-md border border-border/60 bg-white p-2.5 shadow-xs dark:bg-white/95">
               <Image
                 src="/logo.jpeg"
@@ -146,22 +148,22 @@ export default function HomePage() {
                 </div>
               )}
 
-              {/* Email Field */}
+              {/* Officer Email or Code Field */}
               <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-xs font-medium text-foreground">
-                  Email Address
+                <Label htmlFor="identifier" className="text-xs font-medium text-foreground">
+                  Officer Email or Code
                 </Label>
                 <div className="relative">
-                  <Mail className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <UserCheck className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    id="email"
-                    name="email"
-                    type="email"
+                    id="identifier"
+                    name="identifier"
+                    type="text"
                     required
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@gmail.com"
+                    autoComplete="username"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="arafat@eakinhealth.com or OFF-001"
                     className="pl-8"
                     disabled={isLoading}
                   />
@@ -193,7 +195,7 @@ export default function HomePage() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={showPassword ? "Hide password" : "Show password"}
-                    className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden"
+                    className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden cursor-pointer"
                   >
                     {showPassword ? (
                       <EyeOff className="size-3.5" />
@@ -214,11 +216,11 @@ export default function HomePage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="size-3.5 animate-spin" />
-                    <span>Verifying...</span>
+                    <span>Signing in...</span>
                   </>
                 ) : (
                   <>
-                    <span>Sign In</span>
+                    <span>Sign In to Officer Panel</span>
                     <ArrowRight className="size-3.5" />
                   </>
                 )}
@@ -227,10 +229,10 @@ export default function HomePage() {
 
             <div className="mt-4 border-t border-border/60 pt-3 text-center">
               <a
-                href="/officer/login"
+                href="/"
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
               >
-                <span>Sales Officer? Sign In to Officer Portal</span>
+                <span>Admin? Sign In to Admin Panel</span>
                 <ArrowRight className="size-3" />
               </a>
             </div>

@@ -32,11 +32,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAppState } from "@/lib/store"
 import {
-  initialOrders,
-  initialOfficers,
-  initialDepots,
-  productCatalog,
   type Order,
   type OrderStatus,
   type BonusOrderItem,
@@ -53,10 +50,14 @@ interface BonusInputRow {
 }
 
 export default function OrdersPage() {
-  const [orders, setOrders] = React.useState<Order[]>(initialOrders)
-  const [officers] = React.useState<SalesOfficerItem[]>(initialOfficers)
-  const [depots] = React.useState<Depot[]>(initialDepots)
-  const [catalog] = React.useState<Product[]>(productCatalog)
+  const {
+    orders,
+    officers,
+    depots,
+    catalog,
+    approveOrder,
+    cancelOrder,
+  } = useAppState()
 
   // Filters State
   const [statusFilter, setStatusFilter] = React.useState<"all" | OrderStatus>("all")
@@ -252,23 +253,11 @@ export default function OrdersPage() {
 
     const approvedAt = formatDateTime(new Date())
 
-    // Update orders state
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === approvingOrder.id
-          ? {
-              ...o,
-              status: "Approved",
-              officerDiscountPercent,
-              adminDiscountPercent,
-              discountPercent: totalDiscountPercent,
-              discountAmount: totalDiscountAmount,
-              grandTotal,
-              bonusItems: bonusItems.length > 0 ? bonusItems : undefined,
-              approvedAt,
-            }
-          : o
-      )
+    // Update orders state via central store
+    approveOrder(
+      approvingOrder.id,
+      adminDiscountPercent,
+      bonusItems.length > 0 ? bonusItems : undefined
     )
 
     // Update active invoice if it's currently open
@@ -296,17 +285,7 @@ export default function OrdersPage() {
 
     const cancelledAt = formatDateTime(new Date())
 
-    setOrders((prev) =>
-      prev.map((o) =>
-        o.id === cancellingOrder.id
-          ? {
-              ...o,
-              status: "Cancelled",
-              cancelledAt,
-            }
-          : o
-      )
-    )
+    cancelOrder(cancellingOrder.id)
 
     if (selectedInvoiceOrder && selectedInvoiceOrder.id === cancellingOrder.id) {
       setSelectedInvoiceOrder({
@@ -939,13 +918,6 @@ export default function OrdersPage() {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between font-semibold text-primary border-t border-border/60 pt-1">
-                    <span>Total Discount ({selectedInvoiceOrder.discountPercent}%):</span>
-                    <span className="font-mono">
-                      - ৳ {selectedInvoiceOrder.discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-
                   <div className="border-t border-border pt-2 flex items-center justify-between font-bold text-sm text-foreground">
                     <span>Grand Total:</span>
                     <span className="font-mono text-base text-primary">
@@ -955,10 +927,6 @@ export default function OrdersPage() {
                 </div>
               </div>
 
-              {/* Footer Note */}
-              <div className="border-t border-border pt-4 text-center text-[10px] text-muted-foreground">
-                Thank you for choosing Eakin Animal Health Ltd. | System Generated Invoice
-              </div>
             </div>
 
             {/* Modal Bottom Bar */}

@@ -3,6 +3,7 @@ import { Geist_Mono, Outfit } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { AppStateProvider } from "@/lib/store"
 import { cn } from "@/lib/utils"
 
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-sans" })
@@ -13,7 +14,7 @@ const fontMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Admin Login | Eakin Animal Health",
+  title: "Eakin Animal Health",
   description:
     "Sign in to access the Sales, Stock, Credit & Distribution Management Dashboard.",
 }
@@ -30,7 +31,9 @@ export default function RootLayout({
       className={cn("antialiased", fontMono.variable, "font-sans", outfit.variable)}
     >
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AppStateProvider>{children}</AppStateProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

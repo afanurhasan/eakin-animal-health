@@ -37,18 +37,8 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useAppState } from "@/lib/store"
 import {
-  initialOrders,
-  initialCollections,
-  initialProductReturns,
-  initialDepots,
-  initialDepotStocks,
-  initialCustomers,
-  initialOfficers,
-  initialRMs,
-  initialAMs,
-  productCatalog,
-  initialTransfers,
   type Order,
   type CollectionItem,
   type ProductReturnItem,
@@ -58,17 +48,19 @@ import {
 
 export default function DashboardPage() {
   // Global Data State from centralized source of truth
-  const [orders] = React.useState<Order[]>(initialOrders)
-  const [collections] = React.useState<CollectionItem[]>(initialCollections)
-  const [productReturns] = React.useState<ProductReturnItem[]>(initialProductReturns)
-  const [depots] = React.useState(initialDepots)
-  const [depotStocks] = React.useState(initialDepotStocks)
-  const [customers] = React.useState(initialCustomers)
-  const [officers] = React.useState(initialOfficers)
-  const [rms] = React.useState(initialRMs)
-  const [ams] = React.useState(initialAMs)
-  const [catalog] = React.useState(productCatalog)
-  const [transfers] = React.useState<StockTransfer[]>(initialTransfers)
+  const {
+    orders,
+    collections,
+    productReturns,
+    depots,
+    depotStocks,
+    customers,
+    officers,
+    rms,
+    ams,
+    catalog,
+    transfers,
+  } = useAppState()
 
   // Timeline / Period filter state for dashboard
   const [timelineFilter, setTimelineFilter] = React.useState<"all" | "this-month" | "last-30" | "today">("all")
