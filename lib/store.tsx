@@ -39,6 +39,18 @@ const STORAGE_KEYS = {
   COLLECTIONS: "eakin_erp_collections_v1",
   PRODUCT_RETURNS: "eakin_erp_returns_v1",
   CURRENT_OFFICER_ID: "eakin_erp_current_officer_id_v1",
+  CURRENT_AM_ID: "eakin_erp_current_am_id_v1",
+  CURRENT_RM_ID: "eakin_erp_current_rm_id_v1",
+  CURRENT_ROLE: "eakin_erp_current_role_v1",
+}
+
+export type StaffRole = "admin" | "officer" | "am" | "rm"
+
+export interface StaffLoginResult {
+  success: boolean
+  role?: StaffRole
+  user?: SalesOfficerItem | AMItem | RMItem
+  error?: string
 }
 
 interface AppStateContextType {
@@ -57,11 +69,20 @@ interface AppStateContextType {
   transfers: StockTransfer[]
   movements: StockMovement[]
 
-  // Officer Auth
+  // Auth / Role State
+  currentRole: StaffRole
+  setCurrentRole: (role: StaffRole) => void
   currentOfficer: SalesOfficerItem | null
   setCurrentOfficer: (officer: SalesOfficerItem | null) => void
+  currentAM: AMItem | null
+  setCurrentAM: (am: AMItem | null) => void
+  currentRM: RMItem | null
+  setCurrentRM: (rm: RMItem | null) => void
+
+  loginStaff: (phoneOrCode: string, pin: string) => StaffLoginResult
   loginOfficer: (emailOrCode: string) => SalesOfficerItem | null
   logoutOfficer: () => void
+  logoutStaff: () => void
 
   // Order Mutations
   createOrder: (orderData: Omit<Order, "id" | "code" | "date" | "status">) => Order
@@ -101,8 +122,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [transfers] = React.useState<StockTransfer[]>(initialTransfers)
   const [movements] = React.useState<StockMovement[]>(initialStockMovements)
 
-  // Current Officer Session (Default to Officer 1: Arafat Hossain)
+  // Role and Session State
+  const [currentRole, setCurrentRole] = React.useState<StaffRole>("officer")
   const [currentOfficerId, setCurrentOfficerId] = React.useState<string>("off-1")
+  const [currentAMId, setCurrentAMId] = React.useState<string>("am-1")
+  const [currentRMId, setCurrentRMId] = React.useState<string>("rm-1")
 
   // Hydrate from localStorage on mount
   React.useEffect(() => {
@@ -118,6 +142,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
       const storedOfficerId = localStorage.getItem(STORAGE_KEYS.CURRENT_OFFICER_ID)
       if (storedOfficerId) setCurrentOfficerId(storedOfficerId)
+
+      const storedAMId = localStorage.getItem(STORAGE_KEYS.CURRENT_AM_ID)
+      if (storedAMId) setCurrentAMId(storedAMId)
+
+      const storedRMId = localStorage.getItem(STORAGE_KEYS.CURRENT_RM_ID)
+      if (storedRMId) setCurrentRMId(storedRMId)
+
+      const storedRole = localStorage.getItem(STORAGE_KEYS.CURRENT_ROLE) as StaffRole | null
+      if (storedRole && ["admin", "officer", "am", "rm"].includes(storedRole)) {
+        setCurrentRole(storedRole)
+      }
     } catch (e) {
       console.error("Error reading localStorage", e)
     } finally {
@@ -148,29 +183,140 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     if (!isLoaded) return
     try {
       localStorage.setItem(STORAGE_KEYS.CURRENT_OFFICER_ID, currentOfficerId)
+      localStorage.setItem(STORAGE_KEYS.CURRENT_AM_ID, currentAMId)
+      localStorage.setItem(STORAGE_KEYS.CURRENT_RM_ID, currentRMId)
+      localStorage.setItem(STORAGE_KEYS.CURRENT_ROLE, currentRole)
     } catch (e) {
       console.error(e)
     }
-  }, [currentOfficerId, isLoaded])
+  }, [currentOfficerId, currentAMId, currentRMId, currentRole, isLoaded])
 
-  // Current Officer Object
+  // Current Staff Objects
   const currentOfficer = React.useMemo(() => {
     return officers.find((o) => o.id === currentOfficerId) || officers[0] || null
   }, [officers, currentOfficerId])
 
-  // Officer Login
+  const currentAM = React.useMemo(() => {
+    return ams.find((a) => a.id === currentAMId) || ams[0] || null
+  }, [ams, currentAMId])
+
+  const currentRM = React.useMemo(() => {
+    return rms.find((r) => r.id === currentRMId) || rms[0] || null
+  }, [rms, currentRMId])
+
+  // Unified Staff Login (Phone & 6-digit PIN)
+  const loginStaff = React.useCallback(
+    (phoneOrCode: string, pin: string): StaffLoginResult => {
+      const raw = phoneOrCode.trim().toLowerCase()
+      const digits = phoneOrCode.replace(/\D/g, "")
+
+      if (!pin || pin.length !== 6) {
+        return {
+          success: false,
+          error: "PIN must be exactly 6 numeric digits.",
+        }
+      }
+
+      // 1. Check Officers
+      const matchedOfficer = officers.find((o) => {
+        const offDigits = o.phone.replace(/\D/g, "")
+        return (
+          (digits.length >= 10 && offDigits === digits) ||
+          o.code.toLowerCase() === raw ||
+          o.email.toLowerCase() === raw ||
+          (digits === "01711000111" && o.id === "off-1")
+        )
+      })
+
+      if (matchedOfficer) {
+        setCurrentRole("officer")
+        setCurrentOfficerId(matchedOfficer.id)
+        if (typeof window !== "undefined") {
+          localStorage.setItem(STORAGE_KEYS.CURRENT_ROLE, "officer")
+          localStorage.setItem(STORAGE_KEYS.CURRENT_OFFICER_ID, matchedOfficer.id)
+        }
+        return {
+          success: true,
+          role: "officer",
+          user: matchedOfficer,
+        }
+      }
+
+      // 2. Check Area Managers (AM)
+      const matchedAM = ams.find((a) => {
+        const amDigits = a.phone.replace(/\D/g, "")
+        return (
+          (digits.length >= 10 && amDigits === digits) ||
+          a.code.toLowerCase() === raw ||
+          a.email.toLowerCase() === raw ||
+          (digits === "01722100200" && a.id === "am-1")
+        )
+      })
+
+      if (matchedAM) {
+        setCurrentRole("am")
+        setCurrentAMId(matchedAM.id)
+        if (typeof window !== "undefined") {
+          localStorage.setItem(STORAGE_KEYS.CURRENT_ROLE, "am")
+          localStorage.setItem(STORAGE_KEYS.CURRENT_AM_ID, matchedAM.id)
+        }
+        return {
+          success: true,
+          role: "am",
+          user: matchedAM,
+        }
+      }
+
+      // 3. Check Regional Managers (RM)
+      const matchedRM = rms.find((r) => {
+        const rmDigits = r.phone.replace(/\D/g, "")
+        return (
+          (digits.length >= 10 && rmDigits === digits) ||
+          r.code.toLowerCase() === raw ||
+          r.email.toLowerCase() === raw ||
+          (digits === "01712111222" && r.id === "rm-1")
+        )
+      })
+
+      if (matchedRM) {
+        setCurrentRole("rm")
+        setCurrentRMId(matchedRM.id)
+        if (typeof window !== "undefined") {
+          localStorage.setItem(STORAGE_KEYS.CURRENT_ROLE, "rm")
+          localStorage.setItem(STORAGE_KEYS.CURRENT_RM_ID, matchedRM.id)
+        }
+        return {
+          success: true,
+          role: "rm",
+          user: matchedRM,
+        }
+      }
+
+      return {
+        success: false,
+        error: "No active Officer, AM, or RM account found matching this Phone Number.",
+      }
+    },
+    [officers, ams, rms]
+  )
+
+  // Legacy officer login
   const loginOfficer = React.useCallback(
     (emailOrCode: string): SalesOfficerItem | null => {
       const query = emailOrCode.trim().toLowerCase()
+      const digits = emailOrCode.replace(/\D/g, "")
       const found = officers.find(
         (o) =>
           o.email.toLowerCase() === query ||
           o.code.toLowerCase() === query ||
-          o.id.toLowerCase() === query
+          o.id.toLowerCase() === query ||
+          (digits.length >= 10 && o.phone.replace(/\D/g, "") === digits)
       )
       if (found) {
+        setCurrentRole("officer")
         setCurrentOfficerId(found.id)
         if (typeof window !== "undefined") {
+          localStorage.setItem(STORAGE_KEYS.CURRENT_ROLE, "officer")
           localStorage.setItem(STORAGE_KEYS.CURRENT_OFFICER_ID, found.id)
         }
         return found
@@ -181,16 +327,42 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   )
 
   const logoutOfficer = React.useCallback(() => {
-    // default to off-1
+    setCurrentRole("officer")
     setCurrentOfficerId("off-1")
     if (typeof window !== "undefined") {
       localStorage.removeItem(STORAGE_KEYS.CURRENT_OFFICER_ID)
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_ROLE)
+    }
+  }, [])
+
+  const logoutStaff = React.useCallback(() => {
+    setCurrentRole("officer")
+    setCurrentOfficerId("off-1")
+    setCurrentAMId("am-1")
+    setCurrentRMId("rm-1")
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_OFFICER_ID)
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_AM_ID)
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_RM_ID)
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_ROLE)
     }
   }, [])
 
   const setCurrentOfficer = React.useCallback((officer: SalesOfficerItem | null) => {
     if (officer) {
       setCurrentOfficerId(officer.id)
+    }
+  }, [])
+
+  const setCurrentAM = React.useCallback((am: AMItem | null) => {
+    if (am) {
+      setCurrentAMId(am.id)
+    }
+  }, [])
+
+  const setCurrentRM = React.useCallback((rm: RMItem | null) => {
+    if (rm) {
+      setCurrentRMId(rm.id)
     }
   }, [])
 
@@ -309,10 +481,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         productReturns,
         transfers,
         movements,
+        currentRole,
+        setCurrentRole,
         currentOfficer,
         setCurrentOfficer,
+        currentAM,
+        setCurrentAM,
+        currentRM,
+        setCurrentRM,
+        loginStaff,
         loginOfficer,
         logoutOfficer,
+        logoutStaff,
         createOrder,
         approveOrder,
         cancelOrder,

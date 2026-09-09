@@ -51,18 +51,57 @@ interface BonusInputRow {
 
 export default function OrdersPage() {
   const {
+    currentRole,
+    currentRM,
+    currentAM,
+    currentOfficer,
+    areas,
     orders,
     officers,
     depots,
     catalog,
     approveOrder,
     cancelOrder,
+    getOfficerAssignedDepot,
   } = useAppState()
+
+  // Restricted Staff (RM, AM, Officer) belong to their single assigned fulfillment depot
+  const isRestrictedStaff = currentRole === "rm" || currentRole === "am" || currentRole === "officer"
+
+  const assignedDepot = React.useMemo(() => {
+    if (currentRole === "rm") {
+      const area = areas.find((a) => a.id === currentRM?.areaId)
+      return depots.find((d) => d.id === area?.depotId) || depots[0] || null
+    }
+    if (currentRole === "am") {
+      const area = areas.find((a) => a.id === currentAM?.areaId)
+      return depots.find((d) => d.id === area?.depotId) || depots[0] || null
+    }
+    if (currentRole === "officer") {
+      return getOfficerAssignedDepot(currentOfficer?.id || "") || depots[0] || null
+    }
+    return null
+  }, [currentRole, currentRM, currentAM, currentOfficer, areas, depots, getOfficerAssignedDepot])
+
+  // Visible officers in dropdown for RM / AM / Officer
+  const visibleOfficers = React.useMemo(() => {
+    if (currentRole === "rm" && currentRM) {
+      const filtered = officers.filter((o) => o.rmId === currentRM.id || o.areaId === currentRM.areaId)
+      return filtered.length > 0 ? filtered : officers
+    }
+    if (currentRole === "am" && currentAM) {
+      const filtered = officers.filter((o) => o.amId === currentAM.id || o.areaId === currentAM.areaId)
+      return filtered.length > 0 ? filtered : officers
+    }
+    if (currentRole === "officer" && currentOfficer) {
+      return [currentOfficer]
+    }
+    return officers
+  }, [officers, currentRole, currentRM, currentAM, currentOfficer])
 
   // Filters State
   const [statusFilter, setStatusFilter] = React.useState<"all" | OrderStatus>("all")
   const [officerFilter, setOfficerFilter] = React.useState<string>("all")
-  const [depotFilter, setDepotFilter] = React.useState<string>("all")
   const [searchQuery, setSearchQuery] = React.useState<string>("")
 
   // Modal States
@@ -85,9 +124,17 @@ export default function OrdersPage() {
     }, 3000)
   }
 
+  // Base orders for role (RM/AM filtered to their depot)
+  const roleBaseOrders = React.useMemo(() => {
+    if (isRestrictedStaff && assignedDepot) {
+      return orders.filter((o) => o.depotId === assignedDepot.id)
+    }
+    return orders
+  }, [orders, isRestrictedStaff, assignedDepot])
+
   // Filtered Orders Calculation
   const filteredOrders = React.useMemo(() => {
-    return orders.filter((order) => {
+    return roleBaseOrders.filter((order) => {
       // 1. Status Filter
       if (statusFilter !== "all" && order.status !== statusFilter) {
         return false
@@ -98,12 +145,7 @@ export default function OrdersPage() {
         return false
       }
 
-      // 3. Depot Filter
-      if (depotFilter !== "all" && order.depotId !== depotFilter) {
-        return false
-      }
-
-      // 4. Search Filter (Order Code, Customer Name, Customer Code, Officer Name, Shop Name)
+      // 3. Search Filter (Order Code, Customer Name, Customer Code, Officer Name, Shop Name)
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim()
         const matchesCode = order.code.toLowerCase().includes(q)
@@ -118,16 +160,16 @@ export default function OrdersPage() {
 
       return true
     })
-  }, [orders, statusFilter, officerFilter, depotFilter, searchQuery])
+  }, [roleBaseOrders, statusFilter, officerFilter, searchQuery])
 
   // Status Counts
   const statusCounts = React.useMemo(() => {
-    const counts = { all: orders.length, Pending: 0, Approved: 0, Cancelled: 0 }
-    orders.forEach((o) => {
+    const counts = { all: roleBaseOrders.length, Pending: 0, Approved: 0, Cancelled: 0 }
+    roleBaseOrders.forEach((o) => {
       counts[o.status] = (counts[o.status] || 0) + 1
     })
     return counts
-  }, [orders])
+  }, [roleBaseOrders])
 
   // Open Approval Modal
   const handleOpenApproveModal = (order: Order) => {
@@ -403,12 +445,12 @@ export default function OrdersPage() {
               </div>
 
               <div className="text-xs text-muted-foreground font-medium">
-                Showing {filteredOrders.length} of {orders.length} orders
+                Showing {filteredOrders.length} of {roleBaseOrders.length} orders
               </div>
             </div>
 
-            {/* Hierarchical Coordinated Filters + Search Bar */}
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
+            {/* Coordinated Filters + Search Bar */}
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               {/* 1. Sales Officer Filter */}
               <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
                 <UserCheck className="size-3.5 shrink-0 text-muted-foreground" />
@@ -419,7 +461,7 @@ export default function OrdersPage() {
                   className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
                 >
                   <option value="all">All Sales Officers</option>
-                  {officers.map((off) => (
+                  {visibleOfficers.map((off) => (
                     <option key={off.id} value={off.id}>
                       {off.name} ({off.code})
                     </option>
@@ -427,25 +469,7 @@ export default function OrdersPage() {
                 </select>
               </div>
 
-              {/* 2. Depot Filter */}
-              <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                <Building2 className="size-3.5 shrink-0 text-muted-foreground" />
-                <select
-                  aria-label="Filter by Depot"
-                  value={depotFilter}
-                  onChange={(e) => setDepotFilter(e.target.value)}
-                  className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
-                >
-                  <option value="all">All Depots</option>
-                  {depots.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 3. Search Bar */}
+              {/* 2. Search Bar */}
               <div className="relative">
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -572,8 +596,8 @@ export default function OrdersPage() {
                         {/* Actions */}
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            {/* Pending specific actions (No View Invoice) */}
-                            {isPending ? (
+                            {/* Only Admin can Approve or Cancel pending orders */}
+                            {isPending && currentRole === "admin" ? (
                               <>
                                 <Button
                                   type="button"
@@ -597,7 +621,7 @@ export default function OrdersPage() {
                                 </Button>
                               </>
                             ) : (
-                              /* View Invoice for Non-Pending (Approved / Cancelled) */
+                              /* View Invoice for All other roles & Non-Pending states */
                               <Button
                                 type="button"
                                 variant="outline"
@@ -693,9 +717,6 @@ export default function OrdersPage() {
                     <h1 className="text-base font-bold tracking-tight text-foreground">
                       Eakin Animal Health Ltd.
                     </h1>
-                    <p className="text-[11px] text-muted-foreground">
-                      Quality Veterinary Medicines & Nutritional Supplements
-                    </p>
                   </div>
                 </div>
 
@@ -785,10 +806,6 @@ export default function OrdersPage() {
                   <div className="text-xs">
                     <span className="text-muted-foreground">Assigned Depot: </span>
                     <span className="font-semibold text-foreground">{selectedInvoiceOrder.depotName}</span>
-                  </div>
-                  <div className="text-xs">
-                    <span className="text-muted-foreground">Invoice Type: </span>
-                    <span className="font-medium text-foreground">Standard Veterinary Distribution</span>
                   </div>
                 </div>
               </div>
@@ -1024,9 +1041,6 @@ export default function OrdersPage() {
                       <h1 className="text-sm font-bold tracking-tight text-foreground">
                         Eakin Animal Health Ltd.
                       </h1>
-                      <p className="text-[11px] text-muted-foreground">
-                        Quality Veterinary Medicines & Nutritional Supplements
-                      </p>
                     </div>
                   </div>
 

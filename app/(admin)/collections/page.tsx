@@ -948,9 +948,6 @@ export default function CollectionsPage() {
                   <div className="text-xl font-black tracking-tight text-emerald-800">
                     EAKIN ANIMAL HEALTH
                   </div>
-                  <p className="text-xs text-slate-500">
-                    Veterinary Pharmaceuticals & Animal Nutrition
-                  </p>
                   <p className="text-xs font-semibold text-emerald-700 mt-0.5">
                     Official Money Receipt
                   </p>

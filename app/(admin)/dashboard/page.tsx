@@ -35,6 +35,7 @@ import {
   Sparkles,
 } from "lucide-react"
 
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { useAppState } from "@/lib/store"
@@ -47,8 +48,10 @@ import {
 } from "@/lib/mock-data"
 
 export default function DashboardPage() {
+  const router = useRouter()
   // Global Data State from centralized source of truth
   const {
+    currentRole,
     orders,
     collections,
     productReturns,
@@ -61,6 +64,16 @@ export default function DashboardPage() {
     catalog,
     transfers,
   } = useAppState()
+
+  React.useEffect(() => {
+    if (currentRole === "rm") {
+      router.replace("/officer/rm/dashboard")
+    } else if (currentRole === "am") {
+      router.replace("/officer/am/dashboard")
+    } else if (currentRole === "officer") {
+      router.replace("/officer/dashboard")
+    }
+  }, [currentRole, router])
 
   // Timeline / Period filter state for dashboard
   const [timelineFilter, setTimelineFilter] = React.useState<"all" | "this-month" | "last-30" | "today">("all")

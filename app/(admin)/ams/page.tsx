@@ -17,12 +17,14 @@ import {
   ArrowRight,
   Mail,
   Phone,
+  Eye,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAppState } from "@/lib/store"
 import {
   initialAMs,
   initialRMs,
@@ -33,6 +35,7 @@ import {
 } from "@/lib/mock-data"
 
 export default function AreaManagersPage() {
+  const { currentRole, currentRM } = useAppState()
   const [ams, setAms] = React.useState<AMItem[]>(initialAMs)
   const [rms] = React.useState<RMItem[]>(initialRMs)
   const [areas] = React.useState<AreaItem[]>(initialAreasWithDepot)
@@ -66,6 +69,14 @@ export default function AreaManagersPage() {
     }, 2500)
   }
 
+  // Base AMs depending on role (RM sees only their assigned AMs)
+  const roleBaseAMs = React.useMemo(() => {
+    if (currentRole === "rm" && currentRM) {
+      return ams.filter((a) => a.rmId === currentRM.id || a.areaId === currentRM.areaId)
+    }
+    return ams
+  }, [ams, currentRole, currentRM])
+
   // Dependent RMs for the selected Area in the Filter bar
   const availableRMsForFilter = React.useMemo(() => {
     if (selectedAreaFilter === "all") return rms
@@ -84,7 +95,7 @@ export default function AreaManagersPage() {
 
   // Filtered AMs
   const filteredAMs = React.useMemo(() => {
-    return ams.filter((am) => {
+    return roleBaseAMs.filter((am) => {
       const q = searchQuery.toLowerCase().trim()
       const matchesSearch =
         !q ||
@@ -93,15 +104,16 @@ export default function AreaManagersPage() {
         am.phone.toLowerCase().includes(q) ||
         am.email.toLowerCase().includes(q)
 
-      const matchesArea =
-        selectedAreaFilter === "all" || am.areaId === selectedAreaFilter
+      if (!matchesSearch) return false
 
-      const matchesRM =
-        selectedRMFilter === "all" || am.rmId === selectedRMFilter
+      if (currentRole === "admin") {
+        if (selectedAreaFilter !== "all" && am.areaId !== selectedAreaFilter) return false
+        if (selectedRMFilter !== "all" && am.rmId !== selectedRMFilter) return false
+      }
 
-      return matchesSearch && matchesArea && matchesRM
+      return true
     })
-  }, [ams, searchQuery, selectedAreaFilter, selectedRMFilter])
+  }, [roleBaseAMs, searchQuery, currentRole, selectedAreaFilter, selectedRMFilter])
 
   // Available RMs for the form based on selected formData.areaId
   const availableRMsForForm = React.useMemo(() => {
@@ -279,16 +291,18 @@ export default function AreaManagersPage() {
           </p>
         </div>
 
-        {/* Add AM Button */}
-        <Button
-          type="button"
-          onClick={handleOpenCreate}
-          size="sm"
-          className="cursor-pointer gap-1.5 font-medium shadow-xs"
-        >
-          <Plus className="size-4" />
-          <span>Add AM</span>
-        </Button>
+        {/* Add AM Button (Admin Only) */}
+        {currentRole === "admin" && (
+          <Button
+            type="button"
+            onClick={handleOpenCreate}
+            size="sm"
+            className="cursor-pointer gap-1.5 font-medium shadow-xs"
+          >
+            <Plus className="size-4" />
+            <span>Add AM</span>
+          </Button>
+        )}
       </div>
 
       {/* Main Table Card */}
@@ -301,41 +315,45 @@ export default function AreaManagersPage() {
 
             {/* Filter and Search Controls */}
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              {/* Area Filter */}
-              <div className="flex items-center gap-1.5">
-                <Filter className="size-3.5 text-muted-foreground" />
-                <select
-                  aria-label="Filter by Area"
-                  value={selectedAreaFilter}
-                  onChange={(e) => setSelectedAreaFilter(e.target.value)}
-                  className="h-8 rounded border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-                >
-                  <option value="all">All Areas</option>
-                  {areas.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* 1. Area Filter (Admin Only) */}
+              {currentRole === "admin" && (
+                <div className="flex items-center gap-1.5">
+                  <Filter className="size-3.5 text-muted-foreground" />
+                  <select
+                    aria-label="Filter by Area"
+                    value={selectedAreaFilter}
+                    onChange={(e) => setSelectedAreaFilter(e.target.value)}
+                    className="h-8 rounded border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring cursor-pointer"
+                  >
+                    <option value="all">All Areas</option>
+                    {areas.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-              {/* RM Filter */}
-              <div className="flex items-center gap-1.5">
-                <UserRound className="size-3.5 text-muted-foreground" />
-                <select
-                  aria-label="Filter by RM"
-                  value={selectedRMFilter}
-                  onChange={(e) => setSelectedRMFilter(e.target.value)}
-                  className="h-8 rounded border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-                >
-                  <option value="all">All Regional Managers</option>
-                  {availableRMsForFilter.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* 2. RM Filter (Admin Only) */}
+              {currentRole === "admin" && (
+                <div className="flex items-center gap-1.5">
+                  <UserRound className="size-3.5 text-muted-foreground" />
+                  <select
+                    aria-label="Filter by RM"
+                    value={selectedRMFilter}
+                    onChange={(e) => setSelectedRMFilter(e.target.value)}
+                    className="h-8 rounded border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring cursor-pointer"
+                  >
+                    <option value="all">All Regional Managers</option>
+                    {availableRMsForFilter.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} ({r.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Search Bar */}
               <div className="relative w-full sm:w-60">
@@ -448,29 +466,45 @@ export default function AreaManagersPage() {
                       {/* Actions */}
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {/* Edit */}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => handleOpenEdit(am)}
-                            aria-label={`Edit ${am.name}`}
-                            className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                          >
-                            <Pencil className="size-3.5" />
-                          </Button>
+                          {currentRole === "admin" ? (
+                            <>
+                              {/* Edit */}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => handleOpenEdit(am)}
+                                aria-label={`Edit ${am.name}`}
+                                className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                              >
+                                <Pencil className="size-3.5" />
+                              </Button>
 
-                          {/* Delete */}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => setDeletingAM(am)}
-                            aria-label={`Delete ${am.name}`}
-                            className="cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
+                              {/* Delete */}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => setDeletingAM(am)}
+                                aria-label={`Delete ${am.name}`}
+                                className="cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Link href={`/ams/${am.id}`}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="xs"
+                                className="cursor-pointer gap-1 text-[11px] font-medium"
+                              >
+                                <Eye className="size-3 text-muted-foreground" />
+                                <span>View</span>
+                              </Button>
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>

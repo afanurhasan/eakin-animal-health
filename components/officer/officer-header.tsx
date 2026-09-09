@@ -8,11 +8,17 @@ import {
   Moon,
   Sun,
   UserCheck,
+  UsersRound,
+  Shield,
   MapPin,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { officerNavItemsConfig } from "./officer-sidebar"
+import {
+  officerNavItemsConfig,
+  rmNavItemsConfig,
+  amNavItemsConfig,
+} from "./officer-sidebar"
 import { useAppState } from "@/lib/store"
 
 interface OfficerHeaderProps {
@@ -23,23 +29,85 @@ export function OfficerHeader({ onOpenSidebar }: OfficerHeaderProps) {
   const pathname = usePathname()
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
-  const { currentOfficer } = useAppState()
+  const { currentRole, currentOfficer, currentAM, currentRM } = useAppState()
 
   React.useEffect(() => {
     setMounted(true)
   }, [])
 
+  // Active Nav Config based on current role
+  const activeNavConfig = React.useMemo(() => {
+    if (currentRole === "rm") return rmNavItemsConfig
+    if (currentRole === "am") return amNavItemsConfig
+    return officerNavItemsConfig
+  }, [currentRole])
+
   // Determine current page title
-  const currentItem = officerNavItemsConfig.find(
-    (item) =>
-      pathname === item.href ||
-      (item.href !== "/officer/dashboard" && pathname.startsWith(item.href + "/"))
-  )
-  const pageTitle = currentItem ? currentItem.title : "Officer Panel"
+  const pageTitle = React.useMemo(() => {
+    if (pathname === "/officer/rm/dashboard") return "Regional Manager Dashboard"
+    if (pathname === "/officer/am/dashboard") return "Area Manager Dashboard"
+    if (pathname === "/officer/dashboard") return "Sales Officer Dashboard"
+
+    const currentItem = activeNavConfig.find(
+      (item) =>
+        pathname === item.href ||
+        (item.href !== "/officer/dashboard" &&
+          item.href !== "/officer/rm/dashboard" &&
+          item.href !== "/officer/am/dashboard" &&
+          pathname.startsWith(item.href + "/"))
+    )
+    if (currentItem) return currentItem.title
+
+    if (pathname.includes("/customers")) return "Customers"
+    if (pathname.includes("/orders")) return "Orders"
+    if (pathname.includes("/stock")) return "Stock"
+    if (pathname.includes("/officers")) return "Sales Officers"
+    if (pathname.includes("/ams")) return "Area Managers"
+
+    return currentRole === "rm"
+      ? "RM Panel"
+      : currentRole === "am"
+      ? "AM Panel"
+      : "Officer Panel"
+  }, [pathname, activeNavConfig, currentRole])
+
+  // Current active user info for badge
+  const currentUser = React.useMemo(() => {
+    if (currentRole === "rm" && currentRM) {
+      return {
+        name: currentRM.name,
+        code: currentRM.code,
+        territory: currentRM.areaName,
+        roleBadge: "RM",
+        icon: Shield,
+      }
+    }
+    if (currentRole === "am" && currentAM) {
+      return {
+        name: currentAM.name,
+        code: currentAM.code,
+        territory: currentAM.areaName,
+        roleBadge: "AM",
+        icon: UsersRound,
+      }
+    }
+    if (currentOfficer) {
+      return {
+        name: currentOfficer.name,
+        code: currentOfficer.code,
+        territory: currentOfficer.areaName,
+        roleBadge: "Officer",
+        icon: UserCheck,
+      }
+    }
+    return null
+  }, [currentRole, currentOfficer, currentAM, currentRM])
 
   const toggleTheme = () => {
     setTheme(resolvedTheme === "dark" ? "light" : "dark")
   }
+
+  const UserIcon = currentUser?.icon || UserCheck
 
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur-xs md:px-6">
@@ -63,19 +131,22 @@ export function OfficerHeader({ onOpenSidebar }: OfficerHeaderProps) {
         </div>
       </div>
 
-      {/* Right side: Officer Badge & Theme Toggle */}
+      {/* Right side: Role/User Badge & Theme Toggle */}
       <div className="flex items-center gap-2.5">
-        {currentOfficer && (
+        {currentUser && (
           <div className="hidden sm:flex items-center gap-2 rounded-md border border-border/80 bg-muted/30 px-2.5 py-1 text-xs">
-            <UserCheck className="size-3.5 text-primary" />
+            <UserIcon className="size-3.5 text-primary" />
             <div className="flex items-center gap-1.5 font-medium text-foreground">
-              <span>{currentOfficer.name}</span>
-              <span className="font-mono text-[10px] text-muted-foreground">({currentOfficer.code})</span>
+              <span>{currentUser.name}</span>
+              <span className="font-mono text-[10px] text-muted-foreground">({currentUser.code})</span>
             </div>
+            <span className="rounded bg-primary/10 px-1.5 py-0.2 font-mono text-[10px] font-semibold text-primary">
+              {currentUser.roleBadge}
+            </span>
             <div className="h-3 w-px bg-border" />
             <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
               <MapPin className="size-3 text-muted-foreground" />
-              <span>{currentOfficer.areaName}</span>
+              <span>{currentUser.territory}</span>
             </div>
           </div>
         )}

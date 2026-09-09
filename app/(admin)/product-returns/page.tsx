@@ -683,17 +683,17 @@ export default function ProductReturnsPage() {
       {/* MULTI-PRODUCT RETURN MODAL */}
       {/* ========================================================================= */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="relative w-full max-w-4xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+          <div className="relative w-full max-w-4xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-4 sm:my-8">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-                  <RotateCcw className="h-5 w-5" />
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-4 sm:px-6 py-3 sm:py-4">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                  <RotateCcw className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Process Product Return</h3>
-                  <p className="text-xs text-slate-500">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900">Process Product Return</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-500 line-clamp-1 sm:line-clamp-none">
                     Select customer, choose multiple products, specify return quantities together, and restock to depot.
                   </p>
                 </div>
@@ -701,13 +701,13 @@ export default function ProductReturnsPage() {
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={handleProcessReturn} className="p-6 space-y-5">
+            <form onSubmit={handleProcessReturn} className="p-3.5 sm:p-6 space-y-4 sm:space-y-5">
               {formError && (
                 <div className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-200 p-3 text-sm text-rose-700">
                   <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
@@ -1078,22 +1078,22 @@ export default function ProductReturnsPage() {
               )}
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="border-slate-300 text-slate-700 hover:bg-slate-100 text-sm cursor-pointer"
+                  className="border-slate-300 text-slate-700 hover:bg-slate-100 text-xs sm:text-sm cursor-pointer"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={!selectedCustomer || activeReturnItems.length === 0}
-                  className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs sm:text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
                 >
                   <RotateCcw className="h-4 w-4" />
-                  Confirm & Process Return {activeReturnItems.length > 0 && `(৳${totalSummaryRefundAmount.toLocaleString()})`}
+                  Confirm
                 </Button>
               </div>
             </form>
@@ -1141,10 +1141,7 @@ export default function ProductReturnsPage() {
                   <div className="text-xl font-black tracking-tight text-emerald-800">
                     EAKIN ANIMAL HEALTH
                   </div>
-                  <p className="text-xs text-slate-500">
-                    Veterinary Pharmaceuticals & Animal Nutrition
-                  </p>
-                  <p className="text-xs text-slate-400 mt-0.5">Goods Return Voucher (GRV)</p>
+                  <p className="text-xs font-semibold text-slate-600 mt-0.5">Goods Return Voucher</p>
                 </div>
                 <div className="text-right">
                   <div className="text-xs text-slate-500 font-medium">{selectedSlip.date}</div>

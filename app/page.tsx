@@ -29,11 +29,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { useAppState } from "@/lib/store"
 
 export default function HomePage() {
   const router = useRouter()
-  const [email, setEmail] = React.useState("")
-  const [password, setPassword] = React.useState("")
+  const { setCurrentRole } = useAppState()
+  const [email, setEmail] = React.useState("admin@gmail.com")
+  const [password, setPassword] = React.useState("admin1234")
   const [showPassword, setShowPassword] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(false)
   const [notice, setNotice] = React.useState<{
@@ -58,6 +60,10 @@ export default function HomePage() {
         email.trim().toLowerCase() === "admin@gmail.com" &&
         password === "admin1234"
       ) {
+        setCurrentRole("admin")
+        if (typeof window !== "undefined") {
+          localStorage.setItem("eakin_erp_current_role_v1", "admin")
+        }
         setNotice({
           type: "success",
           message: "Login successful! Redirecting to dashboard...",

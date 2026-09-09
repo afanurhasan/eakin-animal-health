@@ -24,6 +24,12 @@ import {
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useAppState } from "@/lib/store"
+import {
+  officerNavItemsConfig,
+  rmNavItemsConfig,
+  amNavItemsConfig,
+} from "@/components/officer/officer-sidebar"
 
 export interface NavItemConfig {
   title: string
@@ -106,6 +112,31 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const pathname = usePathname()
+  const { currentRole, logoutStaff } = useAppState()
+
+  // Select items & config dynamically based on current logged in role
+  const activeNavItems = React.useMemo(() => {
+    if (currentRole === "rm") return rmNavItemsConfig
+    if (currentRole === "am") return amNavItemsConfig
+    if (currentRole === "officer") return officerNavItemsConfig
+    return navItemsConfig
+  }, [currentRole])
+
+  const menuTitle = React.useMemo(() => {
+    if (currentRole === "rm") return "Regional Manager Menu"
+    if (currentRole === "am") return "Area Manager Menu"
+    if (currentRole === "officer") return "Sales Officer Menu"
+    return "Main Navigation"
+  }, [currentRole])
+
+  const brandLink = React.useMemo(() => {
+    if (currentRole === "rm") return "/officer/rm/dashboard"
+    if (currentRole === "am") return "/officer/am/dashboard"
+    if (currentRole === "officer") return "/officer/dashboard"
+    return "/dashboard"
+  }, [currentRole])
+
+  const isStaffUser = currentRole === "rm" || currentRole === "am" || currentRole === "officer"
 
   return (
     <>
@@ -128,7 +159,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
         {/* Brand Header */}
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-sidebar-border px-4">
           <Link
-            href="/dashboard"
+            href={brandLink}
             onClick={onClose}
             className="flex items-center transition-opacity hover:opacity-90"
           >
@@ -160,13 +191,13 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
         {/* Navigation Menu */}
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           <div className="px-3 pb-2 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-            Main Navigation
+            {menuTitle}
           </div>
-          {navItemsConfig.map((item) => {
+          {activeNavItems.map((item) => {
             const Icon = item.icon
             const isActive =
               pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"))
+              (item.href !== brandLink && pathname.startsWith(item.href + "/"))
 
             return (
               <Link
@@ -196,13 +227,24 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
 
         {/* Sidebar Footer / Sign Out Link */}
         <div className="shrink-0 border-t border-sidebar-border p-3">
-          <Link
-            href="/"
-            className="group flex w-full items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-          >
-            <LogOut className="size-4 shrink-0 transition-colors group-hover:text-destructive" />
-            <span className="truncate">Exit to Login</span>
-          </Link>
+          {isStaffUser ? (
+            <Link
+              href="/officer/login"
+              onClick={() => logoutStaff()}
+              className="group flex w-full items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut className="size-4 shrink-0 transition-colors group-hover:text-destructive" />
+              <span className="truncate">Sign Out</span>
+            </Link>
+          ) : (
+            <Link
+              href="/"
+              className="group flex w-full items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut className="size-4 shrink-0 transition-colors group-hover:text-destructive" />
+              <span className="truncate">Exit to Login</span>
+            </Link>
+          )}
         </div>
       </aside>
     </>

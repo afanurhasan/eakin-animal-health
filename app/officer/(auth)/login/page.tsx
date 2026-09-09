@@ -15,7 +15,9 @@ import {
   Info,
   CheckCircle2,
   AlertCircle,
+  Phone,
   UserCheck,
+  Shield,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -31,11 +33,12 @@ import { useAppState } from "@/lib/store"
 
 export default function OfficerLoginPage() {
   const router = useRouter()
-  const { loginOfficer } = useAppState()
+  const { loginStaff } = useAppState()
 
-  const [identifier, setIdentifier] = React.useState("arafat@eakinhealth.com")
-  const [password, setPassword] = React.useState("officer123")
-  const [showPassword, setShowPassword] = React.useState(false)
+  // Default autofilled credentials (Officer 1: Arafat Hossain)
+  const [phone, setPhone] = React.useState("01711000111")
+  const [pin, setPin] = React.useState("123456")
+  const [showPin, setShowPin] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(false)
   const [notice, setNotice] = React.useState<{
     type: "info" | "success" | "error"
@@ -49,29 +52,68 @@ export default function OfficerLoginPage() {
     setMounted(true)
   }, [])
 
+  // Only allow numeric input for PIN (max 6 digits)
+  const handlePinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const numeric = e.target.value.replace(/\D/g, "").slice(0, 6)
+    setPin(numeric)
+  }
+
+  // Quick switch demo credentials
+  const fillCredentials = (quickPhone: string, roleName: string) => {
+    setPhone(quickPhone)
+    setPin("123456")
+    setNotice({
+      type: "info",
+      message: `Loaded ${roleName} credentials. Click "Sign In" to continue.`,
+    })
+  }
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
     setNotice(null)
 
+    if (pin.length !== 6) {
+      setIsLoading(false)
+      setNotice({
+        type: "error",
+        message: "PIN must be exactly 6 numeric digits.",
+      })
+      return
+    }
+
     setTimeout(() => {
-      const loggedIn = loginOfficer(identifier)
-      if (loggedIn) {
+      const res = loginStaff(phone, pin)
+      if (res.success && res.role && res.user) {
+        const roleLabel =
+          res.role === "rm"
+            ? "Regional Manager (RM) Dashboard"
+            : res.role === "am"
+            ? "Area Manager (AM) Dashboard"
+            : "Officer Panel"
+
         setNotice({
           type: "success",
-          message: `Welcome, ${loggedIn.name}! Redirecting to Officer Panel...`,
+          message: `Welcome, ${res.user.name}! Redirecting to ${roleLabel}...`,
         })
+
         setTimeout(() => {
-          router.push("/officer/dashboard")
+          if (res.role === "rm") {
+            router.push("/officer/rm/dashboard")
+          } else if (res.role === "am") {
+            router.push("/officer/am/dashboard")
+          } else {
+            router.push("/officer/dashboard")
+          }
         }, 500)
       } else {
         setIsLoading(false)
         setNotice({
           type: "error",
-          message: "Invalid officer credentials. Enter a valid officer email or officer code.",
+          message: res.error || "Invalid login credentials. Please check your Phone Number and 6-digit PIN.",
         })
       }
-    }, 500)
+    }, 450)
   }
 
   const toggleTheme = () => {
@@ -119,17 +161,21 @@ export default function OfficerLoginPage() {
                 priority
               />
             </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground">Field Operations Portal</h2>
+              <p className="text-xs text-muted-foreground">Officer &bull; AM &bull; RM Staff Login</p>
+            </div>
           </CardHeader>
 
           {/* Form Content */}
-          <CardContent className="pt-2">
+          <CardContent className="pt-1">
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Notice Banner if active */}
               {notice && (
                 <div
                   role="status"
                   className={cn(
-                    "flex items-start gap-2 border p-2.5 text-xs",
+                    "flex items-start gap-2 border p-2.5 text-xs rounded",
                     notice.type === "error"
                       ? "border-destructive/30 bg-destructive/10 text-destructive dark:border-destructive/40"
                       : notice.type === "success"
@@ -148,60 +194,111 @@ export default function OfficerLoginPage() {
                 </div>
               )}
 
-              {/* Officer Email or Code Field */}
+              {/* Phone Number Field */}
               <div className="space-y-1.5">
-                <Label htmlFor="identifier" className="text-xs font-medium text-foreground">
-                  Officer Email or Code
+                <Label htmlFor="phone" className="text-xs font-medium text-foreground">
+                  Phone Number
                 </Label>
                 <div className="relative">
-                  <UserCheck className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Phone className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    id="identifier"
-                    name="identifier"
-                    type="text"
+                    id="phone"
+                    name="phone"
+                    type="tel"
+                    inputMode="tel"
                     required
-                    autoComplete="username"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    placeholder="arafat@eakinhealth.com or OFF-001"
-                    className="pl-8"
+                    autoComplete="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="01XXXXXXXXX"
+                    className="pl-8 font-mono text-xs"
                     disabled={isLoading}
                   />
                 </div>
               </div>
 
-              {/* Password Field */}
+              {/* 6-digit PIN Field */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-xs font-medium text-foreground">
-                    Password
+                  <Label htmlFor="pin" className="text-xs font-medium text-foreground">
+                    6-digit PIN
                   </Label>
+                  <span className="text-[10px] text-muted-foreground">Numeric only</span>
                 </div>
                 <div className="relative">
                   <Lock className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
+                    id="pin"
+                    name="pin"
+                    type={showPin ? "text" : "password"}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
                     required
                     autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    className="pr-8 pl-8"
+                    value={pin}
+                    onChange={handlePinChange}
+                    placeholder="••••••"
+                    className="pr-8 pl-8 font-mono tracking-widest text-xs"
                     disabled={isLoading}
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowPin(!showPin)}
+                    aria-label={showPin ? "Hide PIN" : "Show PIN"}
                     className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-hidden cursor-pointer"
                   >
-                    {showPassword ? (
+                    {showPin ? (
                       <EyeOff className="size-3.5" />
                     ) : (
                       <Eye className="size-3.5" />
                     )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Demo Switchers */}
+              <div className="rounded-md border border-border/70 bg-muted/20 p-2 text-[11px] space-y-1.5">
+                <div className="flex items-center gap-1 font-semibold text-muted-foreground">
+                  <Shield className="size-3 text-primary" />
+                  <span>Quick Demo Accounts (PIN: 123456):</span>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => fillCredentials("01711000111", "Sales Officer")}
+                    className={cn(
+                      "cursor-pointer rounded border px-1.5 py-1 text-center font-medium transition-colors",
+                      phone.replace(/\D/g, "") === "01711000111"
+                        ? "border-primary bg-primary/10 text-primary font-bold"
+                        : "border-border bg-background/80 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    Officer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillCredentials("01722100200", "Area Manager (AM)")}
+                    className={cn(
+                      "cursor-pointer rounded border px-1.5 py-1 text-center font-medium transition-colors",
+                      phone.replace(/\D/g, "") === "01722100200"
+                        ? "border-primary bg-primary/10 text-primary font-bold"
+                        : "border-border bg-background/80 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    AM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fillCredentials("01712111222", "Regional Manager (RM)")}
+                    className={cn(
+                      "cursor-pointer rounded border px-1.5 py-1 text-center font-medium transition-colors",
+                      phone.replace(/\D/g, "") === "01712111222"
+                        ? "border-primary bg-primary/10 text-primary font-bold"
+                        : "border-border bg-background/80 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    RM
                   </button>
                 </div>
               </div>
@@ -220,7 +317,7 @@ export default function OfficerLoginPage() {
                   </>
                 ) : (
                   <>
-                    <span>Sign In to Officer Panel</span>
+                    <span>Sign In</span>
                     <ArrowRight className="size-3.5" />
                   </>
                 )}

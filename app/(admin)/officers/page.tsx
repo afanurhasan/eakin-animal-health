@@ -18,12 +18,14 @@ import {
   ArrowRight,
   Mail,
   Phone,
+  Eye,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAppState } from "@/lib/store"
 import {
   initialOfficers,
   initialAMs,
@@ -36,6 +38,7 @@ import {
 } from "@/lib/mock-data"
 
 export default function SalesOfficersPage() {
+  const { currentRole, currentRM, currentAM } = useAppState()
   const [officers, setOfficers] = React.useState<SalesOfficerItem[]>(initialOfficers)
   const [ams] = React.useState<AMItem[]>(initialAMs)
   const [rms] = React.useState<RMItem[]>(initialRMs)
@@ -72,6 +75,17 @@ export default function SalesOfficersPage() {
     }, 2500)
   }
 
+  // Base Officers depending on role
+  const roleBaseOfficers = React.useMemo(() => {
+    if (currentRole === "rm" && currentRM) {
+      return officers.filter((o) => o.rmId === currentRM.id || o.areaId === currentRM.areaId)
+    }
+    if (currentRole === "am" && currentAM) {
+      return officers.filter((o) => o.amId === currentAM.id || o.areaId === currentAM.areaId)
+    }
+    return officers
+  }, [officers, currentRole, currentRM, currentAM])
+
   // Dependent RMs for the Filter Bar
   const availableRMsForFilter = React.useMemo(() => {
     if (selectedAreaFilter === "all") return rms
@@ -80,12 +94,15 @@ export default function SalesOfficersPage() {
 
   // Dependent AMs for the Filter Bar
   const availableAMsForFilter = React.useMemo(() => {
+    if (currentRole === "rm" && currentRM) {
+      return ams.filter((a) => a.rmId === currentRM.id || a.areaId === currentRM.areaId)
+    }
     return ams.filter((a) => {
       const matchArea = selectedAreaFilter === "all" || a.areaId === selectedAreaFilter
       const matchRM = selectedRMFilter === "all" || a.rmId === selectedRMFilter
       return matchArea && matchRM
     })
-  }, [ams, selectedAreaFilter, selectedRMFilter])
+  }, [ams, currentRole, currentRM, selectedAreaFilter, selectedRMFilter])
 
   // Reset filter selections if parent filter changes
   React.useEffect(() => {
@@ -104,7 +121,7 @@ export default function SalesOfficersPage() {
 
   // Filtered Officers
   const filteredOfficers = React.useMemo(() => {
-    return officers.filter((off) => {
+    return roleBaseOfficers.filter((off) => {
       const q = searchQuery.toLowerCase().trim()
       const matchesSearch =
         !q ||
@@ -113,18 +130,19 @@ export default function SalesOfficersPage() {
         off.phone.toLowerCase().includes(q) ||
         off.email.toLowerCase().includes(q)
 
-      const matchesArea =
-        selectedAreaFilter === "all" || off.areaId === selectedAreaFilter
+      if (!matchesSearch) return false
 
-      const matchesRM =
-        selectedRMFilter === "all" || off.rmId === selectedRMFilter
+      if (currentRole === "admin") {
+        if (selectedAreaFilter !== "all" && off.areaId !== selectedAreaFilter) return false
+        if (selectedRMFilter !== "all" && off.rmId !== selectedRMFilter) return false
+        if (selectedAMFilter !== "all" && off.amId !== selectedAMFilter) return false
+      } else if (currentRole === "rm") {
+        if (selectedAMFilter !== "all" && off.amId !== selectedAMFilter) return false
+      }
 
-      const matchesAM =
-        selectedAMFilter === "all" || off.amId === selectedAMFilter
-
-      return matchesSearch && matchesArea && matchesRM && matchesAM
+      return true
     })
-  }, [officers, searchQuery, selectedAreaFilter, selectedRMFilter, selectedAMFilter])
+  }, [roleBaseOfficers, searchQuery, currentRole, selectedAreaFilter, selectedRMFilter, selectedAMFilter])
 
   // Dependent RMs for the Form based on formData.areaId
   const availableRMsForForm = React.useMemo(() => {
@@ -348,16 +366,18 @@ export default function SalesOfficersPage() {
           </p>
         </div>
 
-        {/* Add Officer Button */}
-        <Button
-          type="button"
-          onClick={handleOpenCreate}
-          size="sm"
-          className="cursor-pointer gap-1.5 font-medium shadow-xs"
-        >
-          <Plus className="size-4" />
-          <span>Add Officer</span>
-        </Button>
+        {/* Add Officer Button (Admin Only) */}
+        {currentRole === "admin" && (
+          <Button
+            type="button"
+            onClick={handleOpenCreate}
+            size="sm"
+            className="cursor-pointer gap-1.5 font-medium shadow-xs"
+          >
+            <Plus className="size-4" />
+            <span>Add Officer</span>
+          </Button>
+        )}
       </div>
 
       {/* Main Table Card */}
@@ -370,61 +390,75 @@ export default function SalesOfficersPage() {
               </CardTitle>
             </div>
 
-            {/* Hierarchical 3-Way Filters + Search */}
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-              {/* 1. Area Wise Filter */}
-              <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                <MapPin className="size-3.5 shrink-0 text-muted-foreground" />
-                <select
-                  aria-label="Area Wise Filter"
-                  value={selectedAreaFilter}
-                  onChange={(e) => setSelectedAreaFilter(e.target.value)}
-                  className="h-7 w-full bg-transparent text-xs text-foreground outline-none"
-                >
-                  <option value="all">All Areas</option>
-                  {areas.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Hierarchical Filters + Search */}
+            <div
+              className={`grid grid-cols-1 gap-2.5 ${
+                currentRole === "rm"
+                  ? "sm:grid-cols-2"
+                  : currentRole === "am"
+                  ? "sm:grid-cols-1"
+                  : "sm:grid-cols-2 lg:grid-cols-4"
+              }`}
+            >
+              {/* 1. Area Wise Filter (Admin Only) */}
+              {currentRole === "admin" && (
+                <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
+                  <MapPin className="size-3.5 shrink-0 text-muted-foreground" />
+                  <select
+                    aria-label="Area Wise Filter"
+                    value={selectedAreaFilter}
+                    onChange={(e) => setSelectedAreaFilter(e.target.value)}
+                    className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
+                  >
+                    <option value="all">All Areas</option>
+                    {areas.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-              {/* 2. RM Wise Filter */}
-              <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                <UserRound className="size-3.5 shrink-0 text-muted-foreground" />
-                <select
-                  aria-label="RM Wise Filter"
-                  value={selectedRMFilter}
-                  onChange={(e) => setSelectedRMFilter(e.target.value)}
-                  className="h-7 w-full bg-transparent text-xs text-foreground outline-none"
-                >
-                  <option value="all">All RMs</option>
-                  {availableRMsForFilter.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* 2. RM Wise Filter (Admin Only) */}
+              {currentRole === "admin" && (
+                <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
+                  <UserRound className="size-3.5 shrink-0 text-muted-foreground" />
+                  <select
+                    aria-label="RM Wise Filter"
+                    value={selectedRMFilter}
+                    onChange={(e) => setSelectedRMFilter(e.target.value)}
+                    className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
+                  >
+                    <option value="all">All RMs</option>
+                    {availableRMsForFilter.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} ({r.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-              {/* 3. AM Wise Filter */}
-              <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                <UsersRound className="size-3.5 shrink-0 text-muted-foreground" />
-                <select
-                  aria-label="AM Wise Filter"
-                  value={selectedAMFilter}
-                  onChange={(e) => setSelectedAMFilter(e.target.value)}
-                  className="h-7 w-full bg-transparent text-xs text-foreground outline-none"
-                >
-                  <option value="all">All AMs</option>
-                  {availableAMsForFilter.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({a.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* 3. AM Wise Filter (Admin and RM only) */}
+              {(currentRole === "admin" || currentRole === "rm") && (
+                <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
+                  <UsersRound className="size-3.5 shrink-0 text-muted-foreground" />
+                  <select
+                    aria-label="AM Wise Filter"
+                    value={selectedAMFilter}
+                    onChange={(e) => setSelectedAMFilter(e.target.value)}
+                    className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
+                  >
+                    <option value="all">All AMs</option>
+                    {availableAMsForFilter.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* 4. Search Bar */}
               <div className="relative">
@@ -542,29 +576,45 @@ export default function SalesOfficersPage() {
                       {/* Actions */}
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {/* Edit */}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => handleOpenEdit(off)}
-                            aria-label={`Edit ${off.name}`}
-                            className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                          >
-                            <Pencil className="size-3.5" />
-                          </Button>
+                          {currentRole === "admin" ? (
+                            <>
+                              {/* Edit */}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => handleOpenEdit(off)}
+                                aria-label={`Edit ${off.name}`}
+                                className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                              >
+                                <Pencil className="size-3.5" />
+                              </Button>
 
-                          {/* Delete */}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => setDeletingOfficer(off)}
-                            aria-label={`Delete ${off.name}`}
-                            className="cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
+                              {/* Delete */}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => setDeletingOfficer(off)}
+                                aria-label={`Delete ${off.name}`}
+                                className="cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Link href={`/officers/${off.id}`}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="xs"
+                                className="cursor-pointer gap-1 text-[11px] font-medium"
+                              >
+                                <Eye className="size-3 text-muted-foreground" />
+                                <span>View</span>
+                              </Button>
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>

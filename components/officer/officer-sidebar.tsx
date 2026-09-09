@@ -11,6 +11,8 @@ import {
   Boxes,
   LogOut,
   X,
+  UserCheck,
+  UsersRound,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -23,6 +25,7 @@ export interface OfficerNavItemConfig {
   icon: React.ComponentType<{ className?: string }>
 }
 
+// 1. Sales Officer Navigation
 export const officerNavItemsConfig: OfficerNavItemConfig[] = [
   {
     title: "Dashboard",
@@ -46,6 +49,69 @@ export const officerNavItemsConfig: OfficerNavItemConfig[] = [
   },
 ]
 
+// 2. Regional Manager (RM) Navigation
+export const rmNavItemsConfig: OfficerNavItemConfig[] = [
+  {
+    title: "Dashboard",
+    href: "/officer/rm/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    title: "AM",
+    href: "/ams",
+    icon: UsersRound,
+  },
+  {
+    title: "Sales Officers",
+    href: "/officers",
+    icon: UserCheck,
+  },
+  {
+    title: "Customers",
+    href: "/customers",
+    icon: Users,
+  },
+  {
+    title: "Orders",
+    href: "/orders",
+    icon: ShoppingCart,
+  },
+  {
+    title: "Stock",
+    href: "/stock-management",
+    icon: Boxes,
+  },
+]
+
+// 3. Area Manager (AM) Navigation
+export const amNavItemsConfig: OfficerNavItemConfig[] = [
+  {
+    title: "Dashboard",
+    href: "/officer/am/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    title: "Sales Officers",
+    href: "/officers",
+    icon: UserCheck,
+  },
+  {
+    title: "Customers",
+    href: "/customers",
+    icon: Users,
+  },
+  {
+    title: "Orders",
+    href: "/orders",
+    icon: ShoppingCart,
+  },
+  {
+    title: "Stock",
+    href: "/stock-management",
+    icon: Boxes,
+  },
+]
+
 interface OfficerSidebarProps {
   isOpen: boolean
   onClose: () => void
@@ -53,7 +119,28 @@ interface OfficerSidebarProps {
 
 export function OfficerSidebar({ isOpen, onClose }: OfficerSidebarProps) {
   const pathname = usePathname()
-  const { currentOfficer, logoutOfficer } = useAppState()
+  const { currentRole, logoutStaff } = useAppState()
+
+  // Select items & meta according to active role
+  const navItems = React.useMemo(() => {
+    if (currentRole === "rm") return rmNavItemsConfig
+    if (currentRole === "am") return amNavItemsConfig
+    return officerNavItemsConfig
+  }, [currentRole])
+
+  const menuTitle =
+    currentRole === "rm"
+      ? "Regional Manager Menu"
+      : currentRole === "am"
+      ? "Area Manager Menu"
+      : "Sales Officer Menu"
+
+  const homeHref =
+    currentRole === "rm"
+      ? "/officer/rm/dashboard"
+      : currentRole === "am"
+      ? "/officer/am/dashboard"
+      : "/officer/dashboard"
 
   return (
     <>
@@ -76,7 +163,7 @@ export function OfficerSidebar({ isOpen, onClose }: OfficerSidebarProps) {
         {/* Brand Header */}
         <div className="flex h-16 shrink-0 items-center justify-between border-b border-sidebar-border px-4">
           <Link
-            href="/officer/dashboard"
+            href={homeHref}
             onClick={onClose}
             className="flex items-center transition-opacity hover:opacity-90"
           >
@@ -108,13 +195,13 @@ export function OfficerSidebar({ isOpen, onClose }: OfficerSidebarProps) {
         {/* Navigation Menu */}
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
           <div className="px-3 pb-2 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
-            Sales Officer Menu
+            {menuTitle}
           </div>
-          {officerNavItemsConfig.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon
             const isActive =
               pathname === item.href ||
-              (item.href !== "/officer/dashboard" && pathname.startsWith(item.href + "/"))
+              (item.href !== homeHref && pathname.startsWith(item.href + "/"))
 
             return (
               <Link
@@ -146,7 +233,7 @@ export function OfficerSidebar({ isOpen, onClose }: OfficerSidebarProps) {
         <div className="shrink-0 border-t border-sidebar-border p-3">
           <Link
             href="/officer/login"
-            onClick={() => logoutOfficer()}
+            onClick={() => logoutStaff()}
             className="group flex w-full items-center gap-3 rounded-md px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
             <LogOut className="size-4 shrink-0 transition-colors group-hover:text-destructive" />

@@ -20,6 +20,7 @@ import {
   Phone,
   Mail,
   CreditCard,
+  Eye,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -37,6 +38,10 @@ import {
 
 export default function CustomersPage() {
   const {
+    currentRole,
+    currentRM,
+    currentAM,
+    currentOfficer,
     customers,
     officers,
     ams,
@@ -87,30 +92,57 @@ export default function CustomersPage() {
     }, 2500)
   }
 
+  // Base Customers depending on role
+  const roleBaseCustomers = React.useMemo(() => {
+    if (currentRole === "rm" && currentRM) {
+      return customers.filter((c) => c.rmId === currentRM.id || c.areaId === currentRM.areaId)
+    }
+    if (currentRole === "am" && currentAM) {
+      return customers.filter((c) => c.amId === currentAM.id || c.areaId === currentAM.areaId)
+    }
+    if (currentRole === "officer" && currentOfficer) {
+      return customers.filter((c) => c.officerId === currentOfficer.id)
+    }
+    return customers
+  }, [customers, currentRole, currentRM, currentAM, currentOfficer])
+
   // Dependent RMs for the Filter Bar
   const availableRMsForFilter = React.useMemo(() => {
     if (selectedAreaFilter === "all") return rms
     return rms.filter((r) => r.areaId === selectedAreaFilter)
   }, [rms, selectedAreaFilter])
 
-  // Dependent AMs for the Filter Bar
+  // Dependent AMs for the Filter Bar (For RM, only their own AMs)
   const availableAMsForFilter = React.useMemo(() => {
+    if (currentRole === "rm" && currentRM) {
+      return ams.filter((a) => a.rmId === currentRM.id || a.areaId === currentRM.areaId)
+    }
     return ams.filter((a) => {
       const matchArea = selectedAreaFilter === "all" || a.areaId === selectedAreaFilter
       const matchRM = selectedRMFilter === "all" || a.rmId === selectedRMFilter
       return matchArea && matchRM
     })
-  }, [ams, selectedAreaFilter, selectedRMFilter])
+  }, [ams, currentRole, currentRM, selectedAreaFilter, selectedRMFilter])
 
-  // Dependent Officers for the Filter Bar
+  // Dependent Officers for the Filter Bar (Scoped per role)
   const availableOfficersForFilter = React.useMemo(() => {
+    if (currentRole === "rm" && currentRM) {
+      return officers.filter((o) => {
+        const belongsToRM = o.rmId === currentRM.id || o.areaId === currentRM.areaId
+        const matchAM = selectedAMFilter === "all" || o.amId === selectedAMFilter
+        return belongsToRM && matchAM
+      })
+    }
+    if (currentRole === "am" && currentAM) {
+      return officers.filter((o) => o.amId === currentAM.id || o.areaId === currentAM.areaId)
+    }
     return officers.filter((o) => {
       const matchArea = selectedAreaFilter === "all" || o.areaId === selectedAreaFilter
       const matchRM = selectedRMFilter === "all" || o.rmId === selectedRMFilter
       const matchAM = selectedAMFilter === "all" || o.amId === selectedAMFilter
       return matchArea && matchRM && matchAM
     })
-  }, [officers, selectedAreaFilter, selectedRMFilter, selectedAMFilter])
+  }, [officers, currentRole, currentRM, currentAM, selectedAreaFilter, selectedRMFilter, selectedAMFilter])
 
   // Filtered Officers in Modal based on user typed search (by name, code, area, etc.)
   const filteredOfficersForModal = React.useMemo(() => {
@@ -185,7 +217,7 @@ export default function CustomersPage() {
 
   // Filtered Customers List
   const filteredCustomers = React.useMemo(() => {
-    return customers.filter((cust) => {
+    return roleBaseCustomers.filter((cust) => {
       const q = searchQuery.toLowerCase().trim()
       const matchesSearch =
         !q ||
@@ -196,21 +228,23 @@ export default function CustomersPage() {
         (cust.email && cust.email.toLowerCase().includes(q)) ||
         cust.address.toLowerCase().includes(q)
 
-      const matchesArea =
-        selectedAreaFilter === "all" || cust.areaId === selectedAreaFilter
+      if (!matchesSearch) return false
 
-      const matchesRM =
-        selectedRMFilter === "all" || cust.rmId === selectedRMFilter
+      if (currentRole === "admin") {
+        if (selectedAreaFilter !== "all" && cust.areaId !== selectedAreaFilter) return false
+        if (selectedRMFilter !== "all" && cust.rmId !== selectedRMFilter) return false
+        if (selectedAMFilter !== "all" && cust.amId !== selectedAMFilter) return false
+        if (selectedOfficerFilter !== "all" && cust.officerId !== selectedOfficerFilter) return false
+      } else if (currentRole === "rm") {
+        if (selectedAMFilter !== "all" && cust.amId !== selectedAMFilter) return false
+        if (selectedOfficerFilter !== "all" && cust.officerId !== selectedOfficerFilter) return false
+      } else if (currentRole === "am") {
+        if (selectedOfficerFilter !== "all" && cust.officerId !== selectedOfficerFilter) return false
+      }
 
-      const matchesAM =
-        selectedAMFilter === "all" || cust.amId === selectedAMFilter
-
-      const matchesOfficer =
-        selectedOfficerFilter === "all" || cust.officerId === selectedOfficerFilter
-
-      return matchesSearch && matchesArea && matchesRM && matchesAM && matchesOfficer
+      return true
     })
-  }, [customers, searchQuery, selectedAreaFilter, selectedRMFilter, selectedAMFilter, selectedOfficerFilter])
+  }, [roleBaseCustomers, searchQuery, currentRole, selectedAreaFilter, selectedRMFilter, selectedAMFilter, selectedOfficerFilter])
 
   const [formErrors, setFormErrors] = React.useState<{
     code?: string
@@ -404,16 +438,18 @@ export default function CustomersPage() {
           </p>
         </div>
 
-        {/* Add Customer Button */}
-        <Button
-          type="button"
-          onClick={handleOpenCreate}
-          size="sm"
-          className="cursor-pointer gap-1.5 font-medium shadow-xs"
-        >
-          <Plus className="size-4" />
-          <span>Add Customer</span>
-        </Button>
+        {/* Add Customer Button (Admin Only) */}
+        {currentRole === "admin" && (
+          <Button
+            type="button"
+            onClick={handleOpenCreate}
+            size="sm"
+            className="cursor-pointer gap-1.5 font-medium shadow-xs"
+          >
+            <Plus className="size-4" />
+            <span>Add Customer</span>
+          </Button>
+        )}
       </div>
 
       {/* Main Table Card */}
@@ -427,69 +463,83 @@ export default function CustomersPage() {
             </div>
 
             {/* Hierarchical Coordinated Filters + Search */}
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-              {/* 1. Area Wise Filter */}
-              <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                <MapPin className="size-3.5 shrink-0 text-muted-foreground" />
-                <select
-                  aria-label="Filter by Area"
-                  value={selectedAreaFilter}
-                  onChange={(e) => setSelectedAreaFilter(e.target.value)}
-                  className="h-7 w-full bg-transparent text-xs text-foreground outline-none"
-                >
-                  <option value="all">All Areas</option>
-                  {areas.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div
+              className={`grid grid-cols-1 gap-2.5 ${
+                currentRole === "rm"
+                  ? "sm:grid-cols-3"
+                  : currentRole === "am"
+                  ? "sm:grid-cols-2"
+                  : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5"
+              }`}
+            >
+              {/* 1. Area Wise Filter (Admin Only) */}
+              {currentRole === "admin" && (
+                <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
+                  <MapPin className="size-3.5 shrink-0 text-muted-foreground" />
+                  <select
+                    aria-label="Filter by Area"
+                    value={selectedAreaFilter}
+                    onChange={(e) => setSelectedAreaFilter(e.target.value)}
+                    className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
+                  >
+                    <option value="all">All Areas</option>
+                    {areas.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-              {/* 2. RM Wise Filter */}
-              <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                <UserRound className="size-3.5 shrink-0 text-muted-foreground" />
-                <select
-                  aria-label="Filter by RM"
-                  value={selectedRMFilter}
-                  onChange={(e) => setSelectedRMFilter(e.target.value)}
-                  className="h-7 w-full bg-transparent text-xs text-foreground outline-none"
-                >
-                  <option value="all">All RMs</option>
-                  {availableRMsForFilter.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* 2. RM Wise Filter (Admin Only) */}
+              {currentRole === "admin" && (
+                <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
+                  <UserRound className="size-3.5 shrink-0 text-muted-foreground" />
+                  <select
+                    aria-label="Filter by RM"
+                    value={selectedRMFilter}
+                    onChange={(e) => setSelectedRMFilter(e.target.value)}
+                    className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
+                  >
+                    <option value="all">All RMs</option>
+                    {availableRMsForFilter.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} ({r.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-              {/* 3. AM Wise Filter */}
-              <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                <UsersRound className="size-3.5 shrink-0 text-muted-foreground" />
-                <select
-                  aria-label="Filter by AM"
-                  value={selectedAMFilter}
-                  onChange={(e) => setSelectedAMFilter(e.target.value)}
-                  className="h-7 w-full bg-transparent text-xs text-foreground outline-none"
-                >
-                  <option value="all">All AMs</option>
-                  {availableAMsForFilter.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({a.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* 3. AM Wise Filter (Admin and RM only) */}
+              {(currentRole === "admin" || currentRole === "rm") && (
+                <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
+                  <UsersRound className="size-3.5 shrink-0 text-muted-foreground" />
+                  <select
+                    aria-label="Filter by AM"
+                    value={selectedAMFilter}
+                    onChange={(e) => setSelectedAMFilter(e.target.value)}
+                    className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
+                  >
+                    <option value="all">All AMs</option>
+                    {availableAMsForFilter.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-              {/* 4. Sales Officer Filter */}
+              {/* 4. Sales Officer Filter (Admin, RM, AM) */}
               <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
                 <UserCheck className="size-3.5 shrink-0 text-muted-foreground" />
                 <select
                   aria-label="Filter by Sales Officer"
                   value={selectedOfficerFilter}
                   onChange={(e) => setSelectedOfficerFilter(e.target.value)}
-                  className="h-7 w-full bg-transparent text-xs text-foreground outline-none"
+                  className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
                 >
                   <option value="all">All Officers</option>
                   {availableOfficersForFilter.map((o) => (
@@ -605,29 +655,45 @@ export default function CustomersPage() {
                       {/* Actions */}
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {/* Edit */}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => handleOpenEdit(cust)}
-                            aria-label={`Edit ${cust.name}`}
-                            className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                          >
-                            <Pencil className="size-3.5" />
-                          </Button>
+                          {currentRole === "admin" ? (
+                            <>
+                              {/* Edit */}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => handleOpenEdit(cust)}
+                                aria-label={`Edit ${cust.name}`}
+                                className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                              >
+                                <Pencil className="size-3.5" />
+                              </Button>
 
-                          {/* Delete */}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => setDeletingCustomer(cust)}
-                            aria-label={`Delete ${cust.name}`}
-                            className="cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
+                              {/* Delete */}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => setDeletingCustomer(cust)}
+                                aria-label={`Delete ${cust.name}`}
+                                className="cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Link href={`/customers/${cust.id}`}>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="xs"
+                                className="cursor-pointer gap-1 text-[11px] font-medium"
+                              >
+                                <Eye className="size-3 text-muted-foreground" />
+                                <span>View</span>
+                              </Button>
+                            </Link>
+                          )}
                         </div>
                       </td>
                     </tr>

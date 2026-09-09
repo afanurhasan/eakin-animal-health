@@ -607,7 +607,6 @@ export default function OfficerCustomerDetailPage() {
                   </div>
                   <div>
                     <h2 className="text-sm font-bold text-foreground">Eakin Animal Health Ltd.</h2>
-                    <p className="text-[11px] text-muted-foreground">Quality Veterinary Medicines & Supplements</p>
                   </div>
                 </div>
                 <div className="text-right">

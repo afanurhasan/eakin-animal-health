@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { useAppState } from "@/lib/store"
 import {
   initialDepots,
   initialDepotStocks,
@@ -58,6 +59,7 @@ interface TransferRow {
 }
 
 export default function StockManagementPage() {
+  const { currentRole, currentRM, currentAM, currentOfficer, areas, getOfficerAssignedDepot } = useAppState()
   const [depots] = React.useState<Depot[]>(initialDepots)
   const [catalog] = React.useState<Product[]>(productCatalog)
   const [depotStocks, setDepotStocks] = React.useState<Record<string, DepotStockItem[]>>(initialDepotStocks)
@@ -66,6 +68,24 @@ export default function StockManagementPage() {
 
   // Active Tab: "depot-stock" | "transfers" | "movement-history"
   const [activeTab, setActiveTab] = React.useState<"depot-stock" | "transfers" | "movement-history">("depot-stock")
+
+  // Restricted Staff (RM, AM, Officer) belong to their single assigned fulfillment depot
+  const isRestrictedStaff = currentRole === "rm" || currentRole === "am" || currentRole === "officer"
+
+  const assignedDepot = React.useMemo(() => {
+    if (currentRole === "rm") {
+      const area = areas.find((a) => a.id === currentRM?.areaId)
+      return depots.find((d) => d.id === area?.depotId) || depots[0] || null
+    }
+    if (currentRole === "am") {
+      const area = areas.find((a) => a.id === currentAM?.areaId)
+      return depots.find((d) => d.id === area?.depotId) || depots[0] || null
+    }
+    if (currentRole === "officer") {
+      return getOfficerAssignedDepot(currentOfficer?.id || "") || depots[0] || null
+    }
+    return null
+  }, [currentRole, currentRM, currentAM, currentOfficer, areas, depots, getOfficerAssignedDepot])
 
   // Filters State for Depot Stock Tab
   const [selectedDepotFilter, setSelectedDepotFilter] = React.useState<string>("all")
@@ -161,10 +181,14 @@ export default function StockManagementPage() {
     return Array.from(set)
   }, [catalog])
 
-  // Filtered Depot Stock Items
+  // Filtered Depot Stock Items (RM & AM are locked to their assigned depot)
   const filteredDepotStock = React.useMemo(() => {
     return allDepotStockList.filter((item) => {
-      if (selectedDepotFilter !== "all" && item.depotId !== selectedDepotFilter) {
+      if (isRestrictedStaff && assignedDepot) {
+        if (item.depotId !== assignedDepot.id) {
+          return false
+        }
+      } else if (selectedDepotFilter !== "all" && item.depotId !== selectedDepotFilter) {
         return false
       }
       if (selectedCategoryFilter !== "all" && item.category !== selectedCategoryFilter) {
@@ -182,14 +206,35 @@ export default function StockManagementPage() {
       }
       return true
     })
-  }, [allDepotStockList, selectedDepotFilter, selectedCategoryFilter, searchStockQuery])
+  }, [allDepotStockList, isRestrictedStaff, assignedDepot, selectedDepotFilter, selectedCategoryFilter, searchStockQuery])
 
-  // Metrics
+  // Metrics (Reflect assigned depot units for RM/AM)
   const totalStockUnits = React.useMemo(() => {
+    if (isRestrictedStaff && assignedDepot) {
+      return allDepotStockList
+        .filter((item) => item.depotId === assignedDepot.id)
+        .reduce((acc, curr) => acc + curr.quantity, 0)
+    }
     return allDepotStockList.reduce((acc, curr) => acc + curr.quantity, 0)
-  }, [allDepotStockList])
+  }, [allDepotStockList, isRestrictedStaff, assignedDepot])
 
-  const totalTransfersCompleted = React.useMemo(() => transfers.length, [transfers])
+  const filteredTransfers = React.useMemo(() => {
+    if (isRestrictedStaff && assignedDepot) {
+      return transfers.filter(
+        (t) => t.sourceDepotId === assignedDepot.id || t.destinationDepotId === assignedDepot.id
+      )
+    }
+    return transfers
+  }, [transfers, isRestrictedStaff, assignedDepot])
+
+  const filteredMovements = React.useMemo(() => {
+    if (isRestrictedStaff && assignedDepot) {
+      return movements.filter((m) => m.depotId === assignedDepot.id)
+    }
+    return movements
+  }, [movements, isRestrictedStaff, assignedDepot])
+
+  const totalTransfersCompleted = React.useMemo(() => filteredTransfers.length, [filteredTransfers])
 
   // Helper: Get product available stock at a depot
   const getProductStockAtDepot = React.useCallback(
@@ -665,19 +710,21 @@ export default function StockManagementPage() {
           </p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Add Stock */}
-          <Button
-            type="button"
-            onClick={() => handleOpenAddStock()}
-            size="sm"
-            className="cursor-pointer gap-1.5 font-medium shadow-xs"
-          >
-            <Plus className="size-4" />
-            <span>Add Stock</span>
-          </Button>
-        </div>
+        {/* Action Buttons (Admin Only) */}
+        {currentRole === "admin" && (
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Add Stock */}
+            <Button
+              type="button"
+              onClick={() => handleOpenAddStock()}
+              size="sm"
+              className="cursor-pointer gap-1.5 font-medium shadow-xs"
+            >
+              <Plus className="size-4" />
+              <span>Add Stock</span>
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Main Tabs Navigation */}
@@ -703,7 +750,7 @@ export default function StockManagementPage() {
               : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
           }`}
         >
-          Depot Transfers ({transfers.length})
+          Depot Transfers ({filteredTransfers.length})
         </button>
 
         <button
@@ -728,7 +775,9 @@ export default function StockManagementPage() {
             <div className="flex flex-col gap-3.5">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-semibold text-foreground">
-                  Depot Inventory ({filteredDepotStock.length} items)
+                  {isRestrictedStaff && assignedDepot
+                    ? `${assignedDepot.name} Inventory (${filteredDepotStock.length} items)`
+                    : `Depot Inventory (${filteredDepotStock.length} items)`}
                 </CardTitle>
                 <div className="text-xs text-muted-foreground">
                   Total Units: <strong className="text-foreground font-mono">{totalStockUnits.toLocaleString()}</strong>
@@ -736,24 +785,26 @@ export default function StockManagementPage() {
               </div>
 
               {/* Filters */}
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                {/* 1. Depot Filter */}
-                <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                  <Building2 className="size-3.5 shrink-0 text-muted-foreground" />
-                  <select
-                    aria-label="Filter by Depot"
-                    value={selectedDepotFilter}
-                    onChange={(e) => setSelectedDepotFilter(e.target.value)}
-                    className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
-                  >
-                    <option value="all">All Depots</option>
-                    {depots.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className={`grid grid-cols-1 gap-2.5 ${isRestrictedStaff ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
+                {/* 1. Depot Filter - Visible ONLY for Admin */}
+                {!isRestrictedStaff && (
+                  <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
+                    <Building2 className="size-3.5 shrink-0 text-muted-foreground" />
+                    <select
+                      aria-label="Filter by Depot"
+                      value={selectedDepotFilter}
+                      onChange={(e) => setSelectedDepotFilter(e.target.value)}
+                      className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
+                    >
+                      <option value="all">All Depots</option>
+                      {depots.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* 2. Category Filter */}
                 <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
@@ -780,7 +831,7 @@ export default function StockManagementPage() {
                     type="search"
                     value={searchStockQuery}
                     onChange={(e) => setSearchStockQuery(e.target.value)}
-                    placeholder="Search product, code, depot..."
+                    placeholder={isRestrictedStaff ? "Search product, code..." : "Search product, code, depot..."}
                     className="h-9 pl-8 text-xs"
                   />
                 </div>
@@ -880,7 +931,7 @@ export default function StockManagementPage() {
               <div>
                 <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                   <ArrowRightLeft className="size-4 text-primary" />
-                  <span>Depot-to-Depot Transfers History ({transfers.length})</span>
+                  <span>Depot-to-Depot Transfers History ({filteredTransfers.length})</span>
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground">
                   Direct inter-depot movements supporting multi-product transfer transactions
@@ -918,7 +969,7 @@ export default function StockManagementPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
-                  {transfers.map((tx, idx) => (
+                  {filteredTransfers.map((tx, idx) => (
                     <tr key={tx.id} className="transition-colors hover:bg-muted/30">
                       <td className="px-4 py-3 text-center font-medium text-muted-foreground">
                         {idx + 1}
@@ -973,7 +1024,7 @@ export default function StockManagementPage() {
           <CardHeader className="border-b border-border/70 p-4">
             <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
               <History className="size-4 text-primary" />
-              <span>Return Log ({movements.length} records)</span>
+              <span>Return Log ({filteredMovements.length} records)</span>
             </CardTitle>
             <CardDescription className="text-xs text-muted-foreground">
               Complete chronological ledger of customer returns and depot product history
@@ -1009,7 +1060,7 @@ export default function StockManagementPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
-                  {movements.map((mov, idx) => {
+                  {filteredMovements.map((mov, idx) => {
                     const isPositive =
                       mov.movementType === "Stock Added" ||
                       mov.movementType === "Transfer In" ||

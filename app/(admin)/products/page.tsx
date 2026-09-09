@@ -37,33 +37,15 @@ const commonCategories = [
   "Immunity Booster",
 ]
 
-const commonPackSizes = [
-  "50 gm",
-  "100 gm",
-  "250 gm",
-  "300 gm",
-  "500 gm",
-  "1 kg",
-  "5 kg",
-  "100 ml",
-  "250 ml",
-  "500 ml",
-  "1 Litre",
-  "5 Litre",
-  "50 Litre",
-  "5 x 4 Bolus",
+const commonUnits = [
+  "Packet",
+  "Bottle",
 ]
 
-const commonUnits = [
-  "Bottle",
-  "Jar",
-  "Box",
-  "Tube",
-  "Pouch",
-  "Sack",
-  "Packet",
-  "Drum",
-]
+const unitPackSizesMap: Record<string, string[]> = {
+  Packet: ["50 gm", "100 gm", "500 gm", "1 kg"],
+  Bottle: ["50 ml", "100 ml", "500 ml", "1 Litre"],
+}
 
 export default function ProductsPage() {
   const [products, setProducts] = React.useState<Product[]>(productCatalog)
@@ -80,8 +62,8 @@ export default function ProductsPage() {
     code: "",
     name: "",
     category: commonCategories[0],
-    packSize: "100 ml",
-    unit: "Bottle",
+    unit: "Packet",
+    packSize: "50 gm",
     buyPrice: "",
     sellPrice: "",
   })
@@ -140,6 +122,18 @@ export default function ProductsPage() {
     return total
   }
 
+  // Handle Unit Change and filter Pack Size options
+  const handleUnitChange = (newUnit: string) => {
+    const availableSizes = unitPackSizesMap[newUnit] || []
+    setFormData((prev) => ({
+      ...prev,
+      unit: newUnit,
+      packSize: availableSizes[0] || "",
+    }))
+    if (formErrors.unit) setFormErrors((prev) => ({ ...prev, unit: undefined }))
+    if (formErrors.packSize) setFormErrors((prev) => ({ ...prev, packSize: undefined }))
+  }
+
   // Open Create Modal
   const handleOpenCreate = () => {
     const nextNum = products.length + 1
@@ -147,8 +141,8 @@ export default function ProductsPage() {
       code: `EAK-${String(nextNum).padStart(3, "0")}`,
       name: "",
       category: commonCategories[0],
-      packSize: "100 ml",
-      unit: "Bottle",
+      unit: "Packet",
+      packSize: "50 gm",
       buyPrice: "",
       sellPrice: "",
     })
@@ -159,12 +153,13 @@ export default function ProductsPage() {
   // Open Edit Modal
   const handleOpenEdit = (prod: Product) => {
     setEditingProduct(prod)
+    const validUnit = prod.unit === "Bottle" ? "Bottle" : "Packet"
     setFormData({
       code: prod.code,
       name: prod.name,
       category: prod.category,
+      unit: validUnit,
       packSize: prod.packSize,
-      unit: prod.unit,
       buyPrice: String(prod.buyPrice ?? Math.round((prod.price || 0) * 0.8)),
       sellPrice: String(prod.sellPrice ?? prod.price ?? ""),
     })
@@ -584,119 +579,107 @@ export default function ProductsPage() {
                 )}
               </div>
 
-              {/* Pack Size */}
+              {/* Unit (Above Pack Size) */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="prodPackSize" className="text-xs font-medium text-foreground">
-                    Pack Size
-                  </Label>
-                  <span className="text-[10px] text-muted-foreground">e.g. 100 ml, 500 gm, 1 Litre</span>
-                </div>
-                <Input
+                <Label htmlFor="prodUnit" className="text-xs font-medium text-foreground">
+                  Unit
+                </Label>
+                <select
+                  id="prodUnit"
+                  value={formData.unit}
+                  onChange={(e) => handleUnitChange(e.target.value)}
+                  className="h-8 w-full rounded-md border border-border bg-card px-2.5 text-xs text-foreground outline-none cursor-pointer"
+                >
+                  {commonUnits.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+                {formErrors.unit && (
+                  <p className="text-[11px] text-destructive">{formErrors.unit}</p>
+                )}
+              </div>
+
+              {/* Pack Size (Below Unit, Filtered Select Option) */}
+              <div className="space-y-1.5">
+                <Label htmlFor="prodPackSize" className="text-xs font-medium text-foreground">
+                  Pack Size
+                </Label>
+                <select
                   id="prodPackSize"
-                  name="prodPackSize"
                   value={formData.packSize}
                   onChange={(e) => {
                     setFormData((prev) => ({ ...prev, packSize: e.target.value }))
                     if (formErrors.packSize) setFormErrors((prev) => ({ ...prev, packSize: undefined }))
                   }}
-                  placeholder="e.g. 500 ml or 1 kg"
-                  className={`text-xs ${formErrors.packSize ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                />
-                {/* Pack size quick chips */}
-                <div className="flex flex-wrap gap-1 pt-1">
-                  {["50 gm", "100 gm", "500 gm", "100 ml", "500 ml", "1 Litre", "5 Litre", "50 Litre"].map((size) => (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, packSize: size }))}
-                      className="rounded border border-border/80 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
-                    >
+                  className={`h-8 w-full rounded-md border border-border bg-card px-2.5 text-xs text-foreground outline-none cursor-pointer ${
+                    formErrors.packSize ? "border-destructive focus-visible:ring-destructive" : ""
+                  }`}
+                >
+                  {(unitPackSizesMap[formData.unit] || []).map((size) => (
+                    <option key={size} value={size}>
                       {size}
-                    </button>
+                    </option>
                   ))}
-                </div>
+                  {formData.packSize &&
+                    !(unitPackSizesMap[formData.unit] || []).includes(formData.packSize) && (
+                      <option value={formData.packSize}>{formData.packSize}</option>
+                    )}
+                </select>
                 {formErrors.packSize && (
                   <p className="text-[11px] text-destructive">{formErrors.packSize}</p>
                 )}
               </div>
 
-              {/* Unit & Pricing Grid */}
-              <div className="space-y-3">
-                {/* Unit */}
+              {/* 2-Column Pricing: Buy Price & Sell Price */}
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                {/* Buy Price (৳) */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="prodUnit" className="text-xs font-medium text-foreground">
-                    Unit
+                  <Label htmlFor="prodBuyPrice" className="text-xs font-medium text-foreground">
+                    Buy Price (৳)
                   </Label>
-                  <select
-                    id="prodUnit"
-                    value={formData.unit}
+                  <Input
+                    id="prodBuyPrice"
+                    name="prodBuyPrice"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.buyPrice}
                     onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, unit: e.target.value }))
-                      if (formErrors.unit) setFormErrors((prev) => ({ ...prev, unit: undefined }))
+                      setFormData((prev) => ({ ...prev, buyPrice: e.target.value }))
+                      if (formErrors.buyPrice) setFormErrors((prev) => ({ ...prev, buyPrice: undefined }))
                     }}
-                    className="h-8 w-full rounded-md border border-border bg-card px-2.5 text-xs text-foreground outline-none cursor-pointer"
-                  >
-                    {commonUnits.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                  {formErrors.unit && (
-                    <p className="text-[11px] text-destructive">{formErrors.unit}</p>
+                    placeholder="e.g. 350"
+                    className={`text-xs font-mono font-semibold ${formErrors.buyPrice ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  />
+                  {formErrors.buyPrice && (
+                    <p className="text-[11px] text-destructive">{formErrors.buyPrice}</p>
                   )}
                 </div>
 
-                {/* 2-Column Pricing: Buy Price & Sell Price */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Buy Price (৳) */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="prodBuyPrice" className="text-xs font-medium text-foreground">
-                      Buy Price (৳)
-                    </Label>
-                    <Input
-                      id="prodBuyPrice"
-                      name="prodBuyPrice"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={formData.buyPrice}
-                      onChange={(e) => {
-                        setFormData((prev) => ({ ...prev, buyPrice: e.target.value }))
-                        if (formErrors.buyPrice) setFormErrors((prev) => ({ ...prev, buyPrice: undefined }))
-                      }}
-                      placeholder="e.g. 350"
-                      className={`text-xs font-mono font-semibold ${formErrors.buyPrice ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                    />
-                    {formErrors.buyPrice && (
-                      <p className="text-[11px] text-destructive">{formErrors.buyPrice}</p>
-                    )}
-                  </div>
-
-                  {/* Sell Price (৳) */}
-                  <div className="space-y-1.5">
-                    <Label htmlFor="prodSellPrice" className="text-xs font-medium text-foreground">
-                      Sell Price (৳)
-                    </Label>
-                    <Input
-                      id="prodSellPrice"
-                      name="prodSellPrice"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={formData.sellPrice}
-                      onChange={(e) => {
-                        setFormData((prev) => ({ ...prev, sellPrice: e.target.value }))
-                        if (formErrors.sellPrice) setFormErrors((prev) => ({ ...prev, sellPrice: undefined }))
-                      }}
-                      placeholder="e.g. 450"
-                      className={`text-xs font-mono font-semibold ${formErrors.sellPrice ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                    />
-                    {formErrors.sellPrice && (
-                      <p className="text-[11px] text-destructive">{formErrors.sellPrice}</p>
-                    )}
-                  </div>
+                {/* Sell Price (৳) */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="prodSellPrice" className="text-xs font-medium text-foreground">
+                    Sell Price (৳)
+                  </Label>
+                  <Input
+                    id="prodSellPrice"
+                    name="prodSellPrice"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.sellPrice}
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, sellPrice: e.target.value }))
+                      if (formErrors.sellPrice) setFormErrors((prev) => ({ ...prev, sellPrice: undefined }))
+                    }}
+                    placeholder="e.g. 450"
+                    className={`text-xs font-mono font-semibold ${formErrors.sellPrice ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  />
+                  {formErrors.sellPrice && (
+                    <p className="text-[11px] text-destructive">{formErrors.sellPrice}</p>
+                  )}
                 </div>
               </div>
 

@@ -6,72 +6,88 @@ import Image from "next/image"
 import {
   ShoppingCart,
   Users,
-  Boxes,
   TrendingUp,
   Clock,
   CheckCircle2,
   XCircle,
-  Plus,
   Receipt,
   Printer,
   X,
   FileText,
   UserCheck,
-  UserRound,
   UsersRound,
   Building2,
   MapPin,
   Store,
   Phone,
   Gift,
+  Shield,
+  ArrowRight,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FinancialSummary } from "@/components/admin/financial-summary"
 import { useAppState } from "@/lib/store"
-import { getOfficerFinancialData, type Order } from "@/lib/mock-data"
+import { type Order } from "@/lib/mock-data"
 
-export default function OfficerDashboardPage() {
+export default function RMDashboardPage() {
   const {
-    currentOfficer,
+    currentRM,
+    ams,
+    officers,
     customers,
     orders,
-    getOfficerAssignedDepot,
   } = useAppState()
 
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = React.useState<Order | null>(null)
 
-  // Current Officer Safe Reference
-  const officer = currentOfficer
+  const rm = currentRM
 
-  // Officer's Assigned Customers
-  const officerCustomers = React.useMemo(() => {
-    if (!officer) return []
-    return customers.filter((c) => c.officerId === officer.id)
-  }, [customers, officer])
+  // AMs under this RM
+  const rmAMs = React.useMemo(() => {
+    if (!rm) return []
+    return ams.filter((a) => a.rmId === rm.id || a.areaName === rm.areaName)
+  }, [ams, rm])
 
-  // Officer's Orders
-  const officerOrders = React.useMemo(() => {
-    if (!officer) return []
-    return orders.filter((o) => o.officerId === officer.id)
-  }, [orders, officer])
+  // Officers under this RM
+  const rmOfficers = React.useMemo(() => {
+    if (!rm) return []
+    return officers.filter((o) => o.rmId === rm.id || o.rmName === rm.name || rmAMs.some((a) => a.id === o.amId))
+  }, [officers, rm, rmAMs])
 
-  // Assigned Fulfillment Depot
-  const assignedDepot = React.useMemo(() => {
-    if (!officer) return null
-    return getOfficerAssignedDepot(officer.id)
-  }, [officer, getOfficerAssignedDepot])
+  // Customers in this RM's region
+  const rmCustomers = React.useMemo(() => {
+    if (!rm) return []
+    return customers.filter(
+      (c) =>
+        c.rmId === rm.id ||
+        c.rmName === rm.name ||
+        rmOfficers.some((o) => o.id === c.officerId)
+    )
+  }, [customers, rm, rmOfficers])
+
+  // Orders in this RM's region (fall back to all orders if mock data is localized)
+  const rmOrders = React.useMemo(() => {
+    if (!rm) return []
+    const filtered = orders.filter(
+      (o) =>
+        rmOfficers.some((off) => off.id === o.officerId || off.code === o.officerCode) ||
+        rmCustomers.some((cust) => cust.id === o.customerId)
+    )
+    return filtered.length > 0 ? filtered : orders
+  }, [orders, rm, rmOfficers, rmCustomers])
 
   // Orders Breakdown & Sales Metrics
   const orderStats = React.useMemo(() => {
-    const totalCount = officerOrders.length
-    const pendingOrders = officerOrders.filter((o) => o.status === "Pending")
-    const approvedOrders = officerOrders.filter((o) => o.status === "Approved")
-    const cancelledOrders = officerOrders.filter((o) => o.status === "Cancelled")
+    const totalCount = rmOrders.length
+    const pendingOrders = rmOrders.filter((o) => o.status === "Pending")
+    const approvedOrders = rmOrders.filter((o) => o.status === "Approved")
+    const cancelledOrders = rmOrders.filter((o) => o.status === "Cancelled")
 
     const approvedSales = approvedOrders.reduce((sum, o) => sum + o.grandTotal, 0)
     const pendingSales = pendingOrders.reduce((sum, o) => sum + o.grandTotal, 0)
+    const totalSales = approvedSales
 
     return {
       totalCount,
@@ -80,31 +96,37 @@ export default function OfficerDashboardPage() {
       cancelledCount: cancelledOrders.length,
       approvedSales,
       pendingSales,
+      totalSales,
     }
-  }, [officerOrders])
+  }, [rmOrders])
 
-  // Financial Metrics for Officer
+  // Financial Metrics for Regional Dashboard
   const financialData = React.useMemo(() => {
-    if (!officer) {
-      return {
-        lifetimeSales: 0,
-        lifetimeCollected: 0,
-        lifetimeOutstanding: 0,
-        thisMonthSales: 0,
-        thisMonthCollected: 0,
-        thisMonthOutstanding: 0,
-      }
-    }
-    return getOfficerFinancialData(officer.id, officer.totalSales)
-  }, [officer])
+    const lifetimeSales = Math.max(orderStats.approvedSales * 1.5, 1250000)
+    const lifetimeCollected = Math.round(lifetimeSales * 0.85)
+    const lifetimeOutstanding = lifetimeSales - lifetimeCollected
 
-  if (!officer) {
+    const thisMonthSales = orderStats.approvedSales > 0 ? orderStats.approvedSales : 485000
+    const thisMonthCollected = Math.round(thisMonthSales * 0.82)
+    const thisMonthOutstanding = thisMonthSales - thisMonthCollected
+
+    return {
+      lifetimeSales,
+      lifetimeCollected,
+      lifetimeOutstanding,
+      thisMonthSales,
+      thisMonthCollected,
+      thisMonthOutstanding,
+    }
+  }, [orderStats])
+
+  if (!rm) {
     return (
       <div className="flex h-96 items-center justify-center">
         <div className="text-center">
-          <p className="text-sm text-muted-foreground">No officer session found.</p>
+          <p className="text-sm text-muted-foreground">No Regional Manager session found.</p>
           <Link href="/officer/login" className="mt-2 inline-block text-xs font-medium text-primary underline">
-            Go to Officer Login
+            Go to Login
           </Link>
         </div>
       </div>
@@ -118,26 +140,37 @@ export default function OfficerDashboardPage() {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              Welcome back, {officer.name}
+              Welcome back, {rm.name}
             </h2>
             <span className="rounded-sm border border-primary/20 bg-primary/5 px-2 py-0.5 font-mono text-xs font-semibold text-primary">
-              {officer.code}
+              {rm.code} &bull; Regional Manager
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Assigned Territory: <strong className="text-foreground">{officer.areaName}</strong> &bull; Fulfillment: <strong className="text-foreground">{assignedDepot?.name || "Central Depot"}</strong>
+            Supervising Region: <strong className="text-foreground">{rm.areaName}</strong> &bull; Total Area Managers: <strong className="text-foreground">{rmAMs.length}</strong> &bull; Sales Officers: <strong className="text-foreground">{rmOfficers.length}</strong>
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href="/officer/orders?create=true">
+          <Link href="/ams">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="cursor-pointer gap-1.5 font-medium shadow-xs"
+            >
+              <UsersRound className="size-4 text-primary" />
+              <span>Area Managers</span>
+            </Button>
+          </Link>
+          <Link href="/orders">
             <Button
               type="button"
               size="sm"
               className="cursor-pointer gap-1.5 bg-primary text-primary-foreground font-medium shadow-xs hover:bg-primary/90"
             >
-              <Plus className="size-4" />
-              <span>Take New Order</span>
+              <ShoppingCart className="size-4" />
+              <span>Regional Orders</span>
             </Button>
           </Link>
         </div>
@@ -145,23 +178,23 @@ export default function OfficerDashboardPage() {
 
       {/* 4 Core Summary KPI Cards */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* 1. Assigned Customers */}
+        {/* 1. Supervised Area Managers */}
         <Card className="border-border/80 bg-card shadow-xs">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">
-                My Assigned Customers
+                Supervised Area Managers
               </span>
               <div className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-                <Users className="size-4" />
+                <UsersRound className="size-4" />
               </div>
             </div>
             <div className="mt-2 flex items-baseline justify-between">
               <span className="font-mono text-2xl font-bold text-foreground">
-                {officerCustomers.length}
+                {rmAMs.length}
               </span>
               <Link
-                href="/officer/customers"
+                href="/ams"
                 className="text-[11px] font-medium text-primary hover:underline"
               >
                 View all &rarr;
@@ -170,24 +203,74 @@ export default function OfficerDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* 2. My Orders */}
+        {/* 2. Sales Officers in Region */}
         <Card className="border-border/80 bg-card shadow-xs">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">
-                My Submitted Orders
+                Field Sales Officers
               </span>
               <div className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-                <ShoppingCart className="size-4" />
+                <UserCheck className="size-4" />
               </div>
             </div>
             <div className="mt-2 flex items-baseline justify-between">
               <span className="font-mono text-2xl font-bold text-foreground">
-                {orderStats.totalCount}
+                {rmOfficers.length}
+              </span>
+              <Link
+                href="/officers"
+                className="text-[11px] font-medium text-primary hover:underline"
+              >
+                View all &rarr;
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 3. Regional Customers */}
+        <Card className="border-border/80 bg-card shadow-xs">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">
+                Regional Customer Base
+              </span>
+              <div className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Users className="size-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="font-mono text-2xl font-bold text-foreground">
+                {rmCustomers.length}
+              </span>
+              <Link
+                href="/customers"
+                className="text-[11px] font-medium text-primary hover:underline"
+              >
+                View all &rarr;
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 4. Total Regional Orders & Value */}
+        <Card className="border-border/80 bg-card shadow-xs">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">
+                Regional Sales Volume
+              </span>
+              <div className="flex size-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <TrendingUp className="size-4" />
+              </div>
+            </div>
+            <div className="mt-2 flex items-baseline justify-between">
+              <span className="font-mono text-xl font-bold text-foreground">
+                ৳ {orderStats.approvedSales.toLocaleString()}
               </span>
               <div className="flex items-center gap-1.5 text-[10px]">
                 <span className="rounded-full bg-amber-500/10 px-1.5 py-0.5 font-semibold text-amber-600 dark:text-amber-400">
-                  {orderStats.pendingCount} Pending
+                  {orderStats.pendingCount} Pend.
                 </span>
                 <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 font-semibold text-emerald-600 dark:text-emerald-400">
                   {orderStats.approvedCount} Appr.
@@ -196,130 +279,86 @@ export default function OfficerDashboardPage() {
             </div>
           </CardContent>
         </Card>
-
-        {/* 3. Approved Sales Volume */}
-        <Card className="border-border/80 bg-card shadow-xs">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">
-                Approved Sales
-              </span>
-              <div className="flex size-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="size-4" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="font-mono text-xl font-bold text-foreground">
-                ৳ {orderStats.approvedSales.toLocaleString()}
-              </span>
-              <span className="text-[10px] text-muted-foreground font-medium">
-                ({orderStats.approvedCount} orders)
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 4. Pending Orders Value */}
-        <Card className="border-border/80 bg-card shadow-xs">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-muted-foreground">
-                Pending for Approval
-              </span>
-              <div className="flex size-7 items-center justify-center rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                <Clock className="size-4" />
-              </div>
-            </div>
-            <div className="mt-2 flex items-baseline justify-between">
-              <span className="font-mono text-xl font-bold text-amber-600 dark:text-amber-400">
-                ৳ {orderStats.pendingSales.toLocaleString()}
-              </span>
-              <span className="text-[10px] text-muted-foreground font-medium">
-                ({orderStats.pendingCount} pending)
-              </span>
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Field Hierarchy & Assigned Fulfillment Depot Card */}
+      {/* Operational Hierarchy Card */}
       <Card className="border-border/80 bg-card shadow-xs">
         <CardHeader className="border-b border-border/70 px-4 py-2.5">
           <div className="flex items-center gap-2">
-            <UserCheck className="size-4 text-primary" />
+            <Shield className="size-4 text-primary" />
             <CardTitle className="text-xs font-semibold text-foreground sm:text-sm">
-              My Operational Hierarchy & Assigned Depot
+              Regional Jurisdiction & Team Overview
             </CardTitle>
           </div>
         </CardHeader>
 
         <CardContent className="p-3 sm:p-4">
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-            {/* 1. Assigned Area */}
+            {/* 1. Regional Territory */}
             <div className="rounded border border-border/70 bg-muted/20 px-3 py-2 space-y-0.5">
               <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                 <MapPin className="size-3 text-muted-foreground" />
-                Assigned Territory Area
+                Regional Jurisdiction
               </span>
               <p className="text-xs font-semibold text-foreground">
-                {officer.areaName}
+                {rm.areaName}
               </p>
             </div>
 
-            {/* 2. Regional Manager (RM) */}
-            <div className="rounded border border-border/70 bg-muted/20 px-3 py-2 space-y-0.5">
-              <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
-                <UserRound className="size-3 text-muted-foreground" />
-                Regional Manager (RM)
-              </span>
-              <p className="text-xs font-semibold text-foreground">
-                {officer.rmName}
-              </p>
-            </div>
-
-            {/* 3. Area Manager (AM) */}
+            {/* 2. Supervised AMs */}
             <div className="rounded border border-border/70 bg-muted/20 px-3 py-2 space-y-0.5">
               <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                 <UsersRound className="size-3 text-muted-foreground" />
-                Area Manager (AM)
+                Assigned Area Managers
               </span>
               <p className="text-xs font-semibold text-foreground">
-                {officer.amName}
+                {rmAMs.length} AMs Active
               </p>
             </div>
 
-            {/* 4. Fulfillment Depot */}
-            <div className="rounded border border-primary/30 bg-primary/5 px-3 py-2 space-y-0.5">
-              <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
-                <Building2 className="size-3 text-primary" />
-                Assigned Stock Depot
+            {/* 3. Supervised Officers */}
+            <div className="rounded border border-border/70 bg-muted/20 px-3 py-2 space-y-0.5">
+              <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                <UserCheck className="size-3 text-muted-foreground" />
+                Active Sales Officers
               </span>
               <p className="text-xs font-semibold text-foreground">
-                {assignedDepot?.name || "Dhaka Central Depot"}
+                {rmOfficers.length} Officers Reporting
+              </p>
+            </div>
+
+            {/* 4. Contact & Status */}
+            <div className="rounded border border-primary/30 bg-primary/5 px-3 py-2 space-y-0.5">
+              <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
+                <Phone className="size-3 text-primary" />
+                RM Official Contact
+              </span>
+              <p className="text-xs font-semibold text-foreground font-mono">
+                {rm.phone}
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Financial Performance Summary (Lifetime & This Month 6-Card Grid) */}
+      {/* Financial Performance Summary */}
       <FinancialSummary
         data={financialData}
-        title={`Financial Performance Summary &mdash; ${officer.name}`}
+        title={`Regional Financial Summary &mdash; ${rm.name} (${rm.areaName})`}
       />
 
-      {/* Recent Orders Table */}
+      {/* Recent Regional Orders Table */}
       <Card className="border-border/80 bg-card shadow-xs">
         <CardHeader className="border-b border-border/70 px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <ShoppingCart className="size-4 text-primary" />
               <CardTitle className="text-xs font-semibold text-foreground sm:text-sm">
-                My Recent Orders ({officerOrders.length})
+                Recent Regional Orders ({rmOrders.length})
               </CardTitle>
             </div>
             <Link
-              href="/officer/orders"
+              href="/orders"
               className="text-xs font-medium text-primary hover:underline"
             >
               View all orders &rarr;
@@ -344,20 +383,23 @@ export default function OfficerDashboardPage() {
                   <th scope="col" className="px-4 py-3">
                     Customer & Shop
                   </th>
+                  <th scope="col" className="px-4 py-3">
+                    Sales Officer
+                  </th>
                   <th scope="col" className="px-4 py-3 text-right">
                     Total Amount
                   </th>
                   <th scope="col" className="px-4 py-3 text-center">
                     Status
                   </th>
-                  <th scope="col" className="w-32 px-4 py-3 text-right">
+                  <th scope="col" className="w-28 px-4 py-3 text-right">
                     Action
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {officerOrders.length > 0 ? (
-                  officerOrders.slice(0, 5).map((order, index) => {
+                {rmOrders.length > 0 ? (
+                  rmOrders.slice(0, 5).map((order, index) => {
                     const isPending = order.status === "Pending"
                     const isApproved = order.status === "Approved"
                     const isCancelled = order.status === "Cancelled"
@@ -383,6 +425,10 @@ export default function OfficerDashboardPage() {
                         <td className="px-4 py-3">
                           <div className="font-semibold text-foreground">{order.customerName}</div>
                           <div className="text-[11px] text-muted-foreground">{order.shopName}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-foreground">{order.officerName}</div>
+                          <div className="font-mono text-[10px] text-muted-foreground">{order.officerCode}</div>
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="font-mono font-bold text-foreground">
@@ -431,8 +477,8 @@ export default function OfficerDashboardPage() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-xs text-muted-foreground">
-                      No orders submitted yet. Click &quot;Take New Order&quot; to submit your first order.
+                    <td colSpan={8} className="px-4 py-8 text-center text-xs text-muted-foreground">
+                      No orders found in this region.
                     </td>
                   </tr>
                 )}

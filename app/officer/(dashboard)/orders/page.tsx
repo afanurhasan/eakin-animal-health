@@ -1138,9 +1138,6 @@ function OfficerOrdersContent() {
                     <h1 className="text-base font-bold tracking-tight text-foreground">
                       Eakin Animal Health Ltd.
                     </h1>
-                    <p className="text-[11px] text-muted-foreground">
-                      Quality Veterinary Medicines & Nutritional Supplements
-                    </p>
                   </div>
                 </div>
 
