@@ -138,8 +138,7 @@ function OfficerOrdersContent() {
     return catalog.filter(
       (p) =>
         p.name.toLowerCase().includes(q) ||
-        p.code.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q)
+        p.code.toLowerCase().includes(q)
     )
   }, [catalog, productSearchQuery])
 
@@ -828,7 +827,7 @@ function OfficerOrdersContent() {
                     <div className="relative">
                       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
-                        placeholder="Type product name, SKU code, or category to search and add..."
+                        placeholder="Type product name or SKU code to search and add..."
                         value={productSearchQuery}
                         onChange={(e) => setProductSearchQuery(e.target.value)}
                         className="pl-9 text-xs"
@@ -856,9 +855,6 @@ function OfficerOrdersContent() {
                                   <div>
                                     <div className="font-bold text-foreground text-xs flex items-center gap-2">
                                       <span>{prod.name}</span>
-                                      <span className="rounded bg-muted px-1.5 py-0.2 text-[9px] font-medium text-muted-foreground">
-                                        {prod.category}
-                                      </span>
                                     </div>
                                     <div className="text-muted-foreground font-mono text-[11px] mt-0.5">
                                       <span className="text-primary font-semibold">{prod.code}</span> &bull; {prod.packSize}
@@ -1282,7 +1278,7 @@ function OfficerOrdersContent() {
                             <td className="px-3 py-1.5 font-mono text-primary font-medium">{bonus.productCode}</td>
                             <td className="px-3 py-1.5 font-semibold text-foreground">{bonus.productName}</td>
                             <td className="px-3 py-1.5 text-muted-foreground">{bonus.packSize}</td>
-                            <td className="px-3 py-1.5 text-right font-mono font-bold text-primary">+{bonus.quantity} {bonus.unit}</td>
+                            <td className="px-3 py-1.5 text-right font-mono font-bold text-primary">+{bonus.quantity}</td>
                           </tr>
                         ))}
                       </tbody>

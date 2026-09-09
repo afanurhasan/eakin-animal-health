@@ -46,7 +46,6 @@ export interface CustomerDeliveredProduct {
   productCode: string
   productName: string
   packSize: string
-  unit: string
   unitPrice: number
   totalDelivered: number
   previouslyReturned: number
@@ -201,7 +200,6 @@ export default function ProductReturnsPage() {
               productCode: item.productCode,
               productName: item.productName,
               packSize: item.packSize,
-              unit: "Units",
               unitPrice: item.unitPrice,
               totalDelivered: 0,
               previouslyReturned: 0,
@@ -293,7 +291,6 @@ export default function ProductReturnsPage() {
           productCode: p.productCode,
           productName: p.productName,
           packSize: p.packSize,
-          unit: p.unit,
           unitPrice: p.unitPrice,
           deliveredQuantity: p.totalDelivered,
           returnedQuantity: safeQty,
@@ -349,7 +346,6 @@ export default function ProductReturnsPage() {
         productCode: item.productCode,
         productName: item.productName,
         packSize: item.packSize,
-        unit: item.unit,
         unitPrice: item.unitPrice,
         deliveredQuantity: item.deliveredQuantity,
         returnedQuantity: item.returnedQuantity,

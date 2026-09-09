@@ -7,10 +7,7 @@ import {
   ArrowLeft,
   Package,
   Building2,
-  Tag,
   RotateCcw,
-  Clock,
-  Store,
 } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -19,7 +16,6 @@ import {
   initialDepots,
   initialDepotStocks,
   initialProductReturns,
-  type Product,
 } from "@/lib/mock-data"
 
 export default function SingleProductPage() {
@@ -47,7 +43,6 @@ export default function SingleProductPage() {
         depotName: depot.name,
         location: depot.location,
         quantity: foundItem ? foundItem.quantity : 0,
-        unit: product.unit,
         minThreshold: foundItem ? foundItem.minThreshold : 20,
       }
     })
@@ -58,7 +53,7 @@ export default function SingleProductPage() {
     return depotStockBreakdown.reduce((acc, curr) => acc + curr.quantity, 0)
   }, [depotStockBreakdown])
 
-  // Product Return history for this specific product (reusing existing initialProductReturns)
+  // Product Return history for this specific product
   const productReturns = React.useMemo(() => {
     const list: Array<{
       returnId: string
@@ -72,7 +67,6 @@ export default function SingleProductPage() {
       depotName: string
       reason?: string
       packSize: string
-      unit: string
       unitPrice: number
       deliveredQuantity: number
       returnedQuantity: number
@@ -94,7 +88,6 @@ export default function SingleProductPage() {
             depotName: ret.depotName,
             reason: ret.reason,
             packSize: item.packSize,
-            unit: item.unit,
             unitPrice: item.unitPrice,
             deliveredQuantity: item.deliveredQuantity,
             returnedQuantity: item.returnedQuantity,
@@ -139,14 +132,7 @@ export default function SingleProductPage() {
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <Tag className="size-3 text-muted-foreground" />
-                    {product.category}
-                  </span>
-                  <span>•</span>
-                  <span>Pack Size: <strong className="text-foreground">{product.packSize}</strong></span>
-                  <span>•</span>
-                  <span>Unit: <strong className="text-foreground">{product.unit}</strong></span>
+                  <span>Pack Size: <strong className="text-foreground font-mono">{product.packSize}</strong></span>
                 </div>
               </div>
             </div>
@@ -166,7 +152,7 @@ export default function SingleProductPage() {
               {/* Sell Price */}
               <div className="rounded-lg border border-border/80 bg-muted/20 px-3.5 py-2.5 text-right">
                 <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-                  Sell Price
+                  Sell Price (TP)
                 </div>
                 <div className="font-mono text-lg font-bold text-primary">
                   ৳ {(product.sellPrice ?? product.price).toLocaleString()}
@@ -176,11 +162,10 @@ export default function SingleProductPage() {
               {/* Total Stock */}
               <div className="rounded-lg border border-primary/30 bg-primary/5 px-3.5 py-2.5 text-right">
                 <div className="text-[10px] uppercase font-bold tracking-wider text-primary">
-                  Total Available Stock
+                  Total Stock Available
                 </div>
                 <div className="font-mono text-lg font-bold text-primary">
-                  {totalStockAcrossDepots.toLocaleString()}{" "}
-                  <span className="text-xs font-normal text-muted-foreground">{product.unit}s</span>
+                  {totalStockAcrossDepots.toLocaleString()}
                 </div>
               </div>
             </div>
@@ -222,7 +207,7 @@ export default function SingleProductPage() {
                     Location
                   </th>
                   <th scope="col" className="px-4 py-3 text-center">
-                    Threshold
+                    Min Threshold
                   </th>
                   <th scope="col" className="px-4 py-3 text-right">
                     Available Stock
@@ -254,10 +239,10 @@ export default function SingleProductPage() {
                         {item.location}
                       </td>
                       <td className="px-4 py-3 text-center font-mono text-muted-foreground">
-                        {item.minThreshold} {item.unit}s
+                        {item.minThreshold}
                       </td>
                       <td className="px-4 py-3 text-right font-mono text-sm font-bold text-foreground">
-                        {item.quantity.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{item.unit}s</span>
+                        {item.quantity.toLocaleString()}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {isOut ? (
@@ -298,7 +283,7 @@ export default function SingleProductPage() {
             </div>
             {productReturns.length > 0 && (
               <span className="text-xs text-muted-foreground">
-                Total Returns: <strong className="font-mono text-purple-600 font-semibold">{productReturns.reduce((sum, r) => sum + r.returnedQuantity, 0)} {product.unit}s</strong>
+                Total Returns: <strong className="font-mono text-purple-600 font-semibold">{productReturns.reduce((sum, r) => sum + r.returnedQuantity, 0)}</strong>
               </span>
             )}
           </div>

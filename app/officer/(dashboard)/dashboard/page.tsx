@@ -650,7 +650,7 @@ export default function OfficerDashboardPage() {
                             <td className="px-3 py-1.5 font-mono text-primary font-medium">{bonus.productCode}</td>
                             <td className="px-3 py-1.5 font-semibold text-foreground">{bonus.productName}</td>
                             <td className="px-3 py-1.5 text-muted-foreground">{bonus.packSize}</td>
-                            <td className="px-3 py-1.5 text-right font-mono font-bold text-primary">+{bonus.quantity} {bonus.unit}</td>
+                            <td className="px-3 py-1.5 text-right font-mono font-bold text-primary">+{bonus.quantity}</td>
                           </tr>
                         ))}
                       </tbody>

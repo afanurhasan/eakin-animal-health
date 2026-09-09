@@ -220,7 +220,7 @@ export default function DepotsPage() {
                     Location
                   </th>
                   <th scope="col" className="px-4 py-3 text-center">
-                    Total Stock Units
+                    Total Stock Quantity
                   </th>
                   <th scope="col" className="w-44 px-4 py-3 text-right">
                     Actions
@@ -231,7 +231,7 @@ export default function DepotsPage() {
                 {filteredDepots.length > 0 ? (
                   filteredDepots.map((depot, index) => {
                     const stockItems = initialDepotStocks[depot.id] || []
-                    const totalUnits = stockItems.reduce((sum, item) => sum + item.quantity, 0)
+                    const totalQuantity = stockItems.reduce((sum, item) => sum + item.quantity, 0)
 
                     return (
                       <tr
@@ -269,11 +269,11 @@ export default function DepotsPage() {
                           </div>
                         </td>
 
-                        {/* Total Stock Units */}
+                        {/* Total Stock Quantity */}
                         <td className="px-4 py-3 text-center">
                           <span className="inline-flex items-center gap-1 rounded border border-border bg-muted/60 px-2 py-0.5 font-mono text-[11px] font-medium text-foreground">
                             <Boxes className="size-3 text-muted-foreground" />
-                            {totalUnits}
+                            {totalQuantity}
                           </span>
                         </td>
 

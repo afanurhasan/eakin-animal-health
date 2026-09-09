@@ -281,7 +281,6 @@ export default function OrdersPage() {
           productName: prod.name,
           packSize: prod.packSize,
           quantity: qty,
-          unit: prod.unit,
         })
       }
     }
@@ -897,7 +896,7 @@ export default function OrdersPage() {
                             <td className="px-3 py-1.5 font-semibold text-foreground">{bonus.productName}</td>
                             <td className="px-3 py-1.5 text-muted-foreground">{bonus.packSize}</td>
                             <td className="px-3 py-1.5 text-right font-mono font-bold text-primary">
-                              +{bonus.quantity} {bonus.unit}
+                              +{bonus.quantity}
                             </td>
                           </tr>
                         ))}
@@ -1336,9 +1335,9 @@ export default function OrdersPage() {
                                 />
                               </div>
 
-                              {/* Unit Display */}
-                              <span className="w-14 text-[11px] text-muted-foreground truncate">
-                                {selectedProduct?.unit || "Units"}
+                              {/* Pack Size Display */}
+                              <span className="w-16 text-[11px] text-muted-foreground font-mono truncate">
+                                {selectedProduct?.packSize || ""}
                               </span>
 
                               {/* Remove button */}

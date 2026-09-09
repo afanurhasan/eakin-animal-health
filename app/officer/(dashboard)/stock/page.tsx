@@ -9,7 +9,6 @@ import {
   AlertTriangle,
   XCircle,
   Package,
-  Layers,
   MapPin,
 } from "lucide-react"
 
@@ -22,12 +21,10 @@ export default function OfficerStockPage() {
   const {
     currentOfficer,
     depotStocks,
-    catalog,
     getOfficerAssignedDepot,
   } = useAppState()
 
   // Filters State
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = React.useState<string>("all")
   const [searchStockQuery, setSearchStockQuery] = React.useState<string>("")
 
   // Assigned Depot for the logged-in officer
@@ -42,35 +39,22 @@ export default function OfficerStockPage() {
     return depotStocks[assignedDepot.id] || []
   }, [depotStocks, assignedDepot])
 
-  // Categories list
-  const categoriesList = React.useMemo(() => {
-    const set = new Set<string>()
-    catalog.forEach((c) => set.add(c.category))
-    return Array.from(set)
-  }, [catalog])
-
   // Filtered Stock Items
   const filteredStock = React.useMemo(() => {
     return stockList.filter((item) => {
-      // Category Filter
-      if (selectedCategoryFilter !== "all" && item.category !== selectedCategoryFilter) {
-        return false
-      }
-
       // Search Query
       if (searchStockQuery.trim()) {
         const q = searchStockQuery.toLowerCase().trim()
         const matchName = item.productName.toLowerCase().includes(q)
         const matchCode = item.productCode.toLowerCase().includes(q)
-        const matchCategory = item.category.toLowerCase().includes(q)
-        if (!matchName && !matchCode && !matchCategory) {
+        if (!matchName && !matchCode) {
           return false
         }
       }
 
       return true
     })
-  }, [stockList, selectedCategoryFilter, searchStockQuery])
+  }, [stockList, searchStockQuery])
 
   // Stock Metrics
   const metrics = React.useMemo(() => {
@@ -223,24 +207,6 @@ export default function OfficerStockPage() {
         <CardHeader className="border-b border-border/70 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2.5">
-              {/* Category Filter */}
-              <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                <Layers className="size-3.5 shrink-0 text-muted-foreground" />
-                <select
-                  aria-label="Filter by Category"
-                  value={selectedCategoryFilter}
-                  onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                  className="h-7 bg-transparent text-xs text-foreground outline-none cursor-pointer"
-                >
-                  <option value="all">All Categories</option>
-                  {categoriesList.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {/* Search Bar */}
               <div className="relative w-full sm:w-64">
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -276,9 +242,6 @@ export default function OfficerStockPage() {
                     Product Name
                   </th>
                   <th scope="col" className="px-4 py-3">
-                    Category
-                  </th>
-                  <th scope="col" className="px-4 py-3">
                     Pack Size
                   </th>
                   <th scope="col" className="px-4 py-3 text-right">
@@ -312,25 +275,15 @@ export default function OfficerStockPage() {
                           {item.productName}
                         </td>
 
-                        {/* Category */}
-                        <td className="px-4 py-3 text-muted-foreground">
-                          <span className="rounded bg-muted px-2 py-0.5 text-[10px] font-medium text-foreground">
-                            {item.category}
-                          </span>
-                        </td>
-
                         {/* Pack Size */}
                         <td className="px-4 py-3 text-muted-foreground font-medium">
                           {item.packSize}
                         </td>
 
-                        {/* Available Stock (Quantity + Unit combined in one column) */}
+                        {/* Available Stock */}
                         <td className="px-4 py-3 text-right">
                           <span className="font-mono text-xs font-bold text-foreground">
                             {item.quantity.toLocaleString()}
-                          </span>{" "}
-                          <span className="text-xs font-normal text-muted-foreground">
-                            {item.unit}s
                           </span>
                         </td>
 
@@ -358,7 +311,7 @@ export default function OfficerStockPage() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-xs text-muted-foreground">
+                    <td colSpan={6} className="px-4 py-10 text-center text-xs text-muted-foreground">
                       No stock records found matching your filters.
                     </td>
                   </tr>

@@ -720,7 +720,7 @@ export default function OfficerCustomerDetailPage() {
                     {selectedReturn.items.map((it, idx) => (
                       <tr key={idx}>
                         <td className="px-3 py-1.5">{it.productName} ({it.packSize})</td>
-                        <td className="px-3 py-1.5 text-center font-bold">{it.returnedQuantity} {it.unit}</td>
+                        <td className="px-3 py-1.5 text-center font-bold">{it.returnedQuantity}</td>
                         <td className="px-3 py-1.5 text-right font-mono font-bold">৳ {it.returnAmount.toLocaleString()}</td>
                       </tr>
                     ))}

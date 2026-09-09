@@ -8,13 +8,9 @@ import {
   Pencil,
   Trash2,
   Package,
-  Eye,
   CheckCircle2,
   AlertTriangle,
   X,
-  Filter,
-  Layers,
-  Sparkles,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -23,34 +19,13 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   productCatalog,
-  initialDepotStocks,
+  PACK_SIZES,
   type Product,
 } from "@/lib/mock-data"
-
-const commonCategories = [
-  "Antibiotics",
-  "Vitamins & Supplements",
-  "Calcium Supplements",
-  "Dewormer",
-  "Liver Tonics",
-  "Feed Supplement",
-  "Immunity Booster",
-]
-
-const commonUnits = [
-  "Packet",
-  "Bottle",
-]
-
-const unitPackSizesMap: Record<string, string[]> = {
-  Packet: ["50 gm", "100 gm", "500 gm", "1 kg"],
-  Bottle: ["50 ml", "100 ml", "500 ml", "1 Litre"],
-}
 
 export default function ProductsPage() {
   const [products, setProducts] = React.useState<Product[]>(productCatalog)
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = React.useState("all")
 
   // Modal States
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
@@ -61,9 +36,7 @@ export default function ProductsPage() {
   const [formData, setFormData] = React.useState({
     code: "",
     name: "",
-    category: commonCategories[0],
-    unit: "Packet",
-    packSize: "50 gm",
+    packSize: "",
     buyPrice: "",
     sellPrice: "",
   })
@@ -71,9 +44,7 @@ export default function ProductsPage() {
   const [formErrors, setFormErrors] = React.useState<{
     code?: string
     name?: string
-    category?: string
     packSize?: string
-    unit?: string
     buyPrice?: string
     sellPrice?: string
   }>({})
@@ -87,52 +58,18 @@ export default function ProductsPage() {
     }, 2500)
   }
 
-  // Categories list for filter
-  const categoriesList = React.useMemo(() => {
-    const set = new Set<string>()
-    products.forEach((p) => set.add(p.category))
-    return Array.from(set)
-  }, [products])
-
   // Filtered Products
   const filteredProducts = React.useMemo(() => {
     return products.filter((prod) => {
       const q = searchQuery.toLowerCase().trim()
-      const matchesSearch =
-        !q ||
+      if (!q) return true
+      return (
         prod.name.toLowerCase().includes(q) ||
         prod.code.toLowerCase().includes(q) ||
-        prod.category.toLowerCase().includes(q) ||
         prod.packSize.toLowerCase().includes(q)
-
-      const matchesCategory =
-        selectedCategoryFilter === "all" || prod.category === selectedCategoryFilter
-
-      return matchesSearch && matchesCategory
+      )
     })
-  }, [products, searchQuery, selectedCategoryFilter])
-
-  // Calculate total stock for a product across all depots
-  const getTotalProductStock = (productId: string) => {
-    let total = 0
-    Object.values(initialDepotStocks).forEach((stockList) => {
-      const found = stockList.find((item) => item.productId === productId)
-      if (found) total += found.quantity
-    })
-    return total
-  }
-
-  // Handle Unit Change and filter Pack Size options
-  const handleUnitChange = (newUnit: string) => {
-    const availableSizes = unitPackSizesMap[newUnit] || []
-    setFormData((prev) => ({
-      ...prev,
-      unit: newUnit,
-      packSize: availableSizes[0] || "",
-    }))
-    if (formErrors.unit) setFormErrors((prev) => ({ ...prev, unit: undefined }))
-    if (formErrors.packSize) setFormErrors((prev) => ({ ...prev, packSize: undefined }))
-  }
+  }, [products, searchQuery])
 
   // Open Create Modal
   const handleOpenCreate = () => {
@@ -140,9 +77,7 @@ export default function ProductsPage() {
     setFormData({
       code: `EAK-${String(nextNum).padStart(3, "0")}`,
       name: "",
-      category: commonCategories[0],
-      unit: "Packet",
-      packSize: "50 gm",
+      packSize: "100ml",
       buyPrice: "",
       sellPrice: "",
     })
@@ -153,12 +88,9 @@ export default function ProductsPage() {
   // Open Edit Modal
   const handleOpenEdit = (prod: Product) => {
     setEditingProduct(prod)
-    const validUnit = prod.unit === "Bottle" ? "Bottle" : "Packet"
     setFormData({
       code: prod.code,
       name: prod.name,
-      category: prod.category,
-      unit: validUnit,
       packSize: prod.packSize,
       buyPrice: String(prod.buyPrice ?? Math.round((prod.price || 0) * 0.8)),
       sellPrice: String(prod.sellPrice ?? prod.price ?? ""),
@@ -172,9 +104,7 @@ export default function ProductsPage() {
     const errors: {
       code?: string
       name?: string
-      category?: string
       packSize?: string
-      unit?: string
       buyPrice?: string
       sellPrice?: string
     } = {}
@@ -185,14 +115,8 @@ export default function ProductsPage() {
     if (!formData.name.trim()) {
       errors.name = "Please provide a product name."
     }
-    if (!formData.category.trim()) {
-      errors.category = "Please select or enter a category."
-    }
     if (!formData.packSize.trim()) {
       errors.packSize = "Please specify a pack size."
-    }
-    if (!formData.unit.trim()) {
-      errors.unit = "Please select or specify a unit."
     }
     if (!formData.buyPrice.trim() || isNaN(parseFloat(formData.buyPrice)) || parseFloat(formData.buyPrice) <= 0) {
       errors.buyPrice = "Please enter a valid buy price in Taka."
@@ -217,9 +141,7 @@ export default function ProductsPage() {
                 ...item,
                 code: formData.code.trim().toUpperCase(),
                 name: formData.name.trim(),
-                category: formData.category.trim(),
                 packSize: formData.packSize.trim(),
-                unit: formData.unit.trim(),
                 buyPrice: buyPriceNum,
                 sellPrice: sellPriceNum,
                 price: sellPriceNum,
@@ -234,9 +156,7 @@ export default function ProductsPage() {
         id: `prod-${Date.now()}`,
         code: formData.code.trim().toUpperCase(),
         name: formData.name.trim(),
-        category: formData.category.trim(),
         packSize: formData.packSize.trim(),
-        unit: formData.unit.trim(),
         buyPrice: buyPriceNum,
         sellPrice: sellPriceNum,
         price: sellPriceNum,
@@ -273,7 +193,7 @@ export default function ProductsPage() {
             Products
           </h2>
           <p className="text-xs text-muted-foreground">
-            Manage veterinary formulations, antibiotics, supplements, pack sizes, and pricing catalog.
+            Manage veterinary formulations, medicines, pack sizes, and pricing catalog.
           </p>
         </div>
 
@@ -297,37 +217,16 @@ export default function ProductsPage() {
               Products Catalog ({filteredProducts.length})
             </CardTitle>
 
-            {/* Filter & Search */}
-            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
-              {/* Category Filter */}
-              <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                <Layers className="size-3.5 shrink-0 text-muted-foreground" />
-                <select
-                  aria-label="Filter by Category"
-                  value={selectedCategoryFilter}
-                  onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                  className="h-7 bg-transparent text-xs text-foreground outline-none cursor-pointer"
-                >
-                  <option value="all">All Categories</option>
-                  {categoriesList.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Search Bar */}
-              <div className="relative w-full sm:w-64">
-                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search product, code, category..."
-                  className="h-8 pl-8 text-xs"
-                />
-              </div>
+            {/* Search */}
+            <div className="relative w-full sm:w-72">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search product name or code..."
+                className="h-8 pl-8 text-xs"
+              />
             </div>
           </div>
         </CardHeader>
@@ -348,12 +247,6 @@ export default function ProductsPage() {
                   </th>
                   <th scope="col" className="px-4 py-3">
                     Pack Size
-                  </th>
-                  <th scope="col" className="px-4 py-3">
-                    Category
-                  </th>
-                  <th scope="col" className="px-4 py-3">
-                    Unit
                   </th>
                   <th scope="col" className="px-4 py-3 text-right">
                     Buy Price (৳)
@@ -398,19 +291,9 @@ export default function ProductsPage() {
 
                       {/* Pack Size */}
                       <td className="px-4 py-3 text-muted-foreground font-medium">
-                        <span className="rounded bg-muted/60 px-1.5 py-0.5 text-[11px] text-foreground font-mono">
+                        <span className="rounded bg-muted/60 px-2 py-0.5 text-[11px] text-foreground font-mono font-medium">
                           {prod.packSize}
                         </span>
-                      </td>
-
-                      {/* Category */}
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {prod.category}
-                      </td>
-
-                      {/* Unit */}
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {prod.unit}
                       </td>
 
                       {/* Buy Price */}
@@ -455,7 +338,7 @@ export default function ProductsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-xs text-muted-foreground">
+                    <td colSpan={7} className="px-4 py-8 text-center text-xs text-muted-foreground">
                       No products found matching your search.
                     </td>
                   </tr>
@@ -522,7 +405,7 @@ export default function ProductsPage() {
                     setFormData((prev) => ({ ...prev, code: e.target.value }))
                     if (formErrors.code) setFormErrors((prev) => ({ ...prev, code: undefined }))
                   }}
-                  placeholder="e.g. EAK-AMX-100"
+                  placeholder="e.g. EAK-EFL-100"
                   className={`text-xs font-mono uppercase ${formErrors.code ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 />
                 {formErrors.code && (
@@ -543,7 +426,7 @@ export default function ProductsPage() {
                     setFormData((prev) => ({ ...prev, name: e.target.value }))
                     if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: undefined }))
                   }}
-                  placeholder="e.g. Eakmox-Vet Liquid"
+                  placeholder="e.g. Eflor 20"
                   className={`text-xs ${formErrors.name ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   autoFocus
                 />
@@ -552,81 +435,32 @@ export default function ProductsPage() {
                 )}
               </div>
 
-              {/* Category */}
+              {/* Pack Size Select Dropdown */}
               <div className="space-y-1.5">
-                <Label htmlFor="prodCategory" className="text-xs font-medium text-foreground">
-                  Category
+                <Label htmlFor="prodPackSize" className="text-xs font-medium text-foreground">
+                  Pack Size *
                 </Label>
-                <div className="space-y-1.5">
+                <div className="relative">
                   <select
-                    id="prodCategory"
-                    value={formData.category}
+                    id="prodPackSize"
+                    name="prodPackSize"
+                    value={formData.packSize}
                     onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, category: e.target.value }))
-                      if (formErrors.category) setFormErrors((prev) => ({ ...prev, category: undefined }))
+                      setFormData((prev) => ({ ...prev, packSize: e.target.value }))
+                      if (formErrors.packSize) setFormErrors((prev) => ({ ...prev, packSize: undefined }))
                     }}
-                    className="h-8 w-full rounded-md border border-border bg-card px-2.5 text-xs text-foreground outline-none cursor-pointer"
+                    className={`h-9 w-full rounded-md border bg-background px-3 py-1.5 text-xs font-medium text-foreground shadow-xs transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer ${
+                      formErrors.packSize ? "border-destructive focus:ring-destructive" : "border-input"
+                    }`}
                   >
-                    {commonCategories.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
+                    <option value="">Select Pack Size</option>
+                    {PACK_SIZES.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
                       </option>
                     ))}
                   </select>
                 </div>
-                {formErrors.category && (
-                  <p className="text-[11px] text-destructive">{formErrors.category}</p>
-                )}
-              </div>
-
-              {/* Unit (Above Pack Size) */}
-              <div className="space-y-1.5">
-                <Label htmlFor="prodUnit" className="text-xs font-medium text-foreground">
-                  Unit
-                </Label>
-                <select
-                  id="prodUnit"
-                  value={formData.unit}
-                  onChange={(e) => handleUnitChange(e.target.value)}
-                  className="h-8 w-full rounded-md border border-border bg-card px-2.5 text-xs text-foreground outline-none cursor-pointer"
-                >
-                  {commonUnits.map((u) => (
-                    <option key={u} value={u}>
-                      {u}
-                    </option>
-                  ))}
-                </select>
-                {formErrors.unit && (
-                  <p className="text-[11px] text-destructive">{formErrors.unit}</p>
-                )}
-              </div>
-
-              {/* Pack Size (Below Unit, Filtered Select Option) */}
-              <div className="space-y-1.5">
-                <Label htmlFor="prodPackSize" className="text-xs font-medium text-foreground">
-                  Pack Size
-                </Label>
-                <select
-                  id="prodPackSize"
-                  value={formData.packSize}
-                  onChange={(e) => {
-                    setFormData((prev) => ({ ...prev, packSize: e.target.value }))
-                    if (formErrors.packSize) setFormErrors((prev) => ({ ...prev, packSize: undefined }))
-                  }}
-                  className={`h-8 w-full rounded-md border border-border bg-card px-2.5 text-xs text-foreground outline-none cursor-pointer ${
-                    formErrors.packSize ? "border-destructive focus-visible:ring-destructive" : ""
-                  }`}
-                >
-                  {(unitPackSizesMap[formData.unit] || []).map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                  {formData.packSize &&
-                    !(unitPackSizesMap[formData.unit] || []).includes(formData.packSize) && (
-                      <option value={formData.packSize}>{formData.packSize}</option>
-                    )}
-                </select>
                 {formErrors.packSize && (
                   <p className="text-[11px] text-destructive">{formErrors.packSize}</p>
                 )}
@@ -650,7 +484,7 @@ export default function ProductsPage() {
                       setFormData((prev) => ({ ...prev, buyPrice: e.target.value }))
                       if (formErrors.buyPrice) setFormErrors((prev) => ({ ...prev, buyPrice: undefined }))
                     }}
-                    placeholder="e.g. 350"
+                    placeholder="e.g. 620"
                     className={`text-xs font-mono font-semibold ${formErrors.buyPrice ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   />
                   {formErrors.buyPrice && (
@@ -661,7 +495,7 @@ export default function ProductsPage() {
                 {/* Sell Price (৳) */}
                 <div className="space-y-1.5">
                   <Label htmlFor="prodSellPrice" className="text-xs font-medium text-foreground">
-                    Sell Price (৳)
+                    Sell Price / TP (৳)
                   </Label>
                   <Input
                     id="prodSellPrice"
@@ -674,7 +508,7 @@ export default function ProductsPage() {
                       setFormData((prev) => ({ ...prev, sellPrice: e.target.value }))
                       if (formErrors.sellPrice) setFormErrors((prev) => ({ ...prev, sellPrice: undefined }))
                     }}
-                    placeholder="e.g. 450"
+                    placeholder="e.g. 780"
                     className={`text-xs font-mono font-semibold ${formErrors.sellPrice ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   />
                   {formErrors.sellPrice && (

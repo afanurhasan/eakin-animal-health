@@ -759,7 +759,7 @@ export default function CustomerDetailPage() {
                           <td className="px-2.5 py-2 font-medium text-foreground">{item.productName}</td>
                           <td className="px-2.5 py-2 text-muted-foreground font-mono text-[11px]">{item.packSize}</td>
                           <td className="px-2.5 py-2 text-center font-mono font-bold text-purple-600">
-                            {item.returnedQuantity} {item.unit}s
+                            {item.returnedQuantity}
                           </td>
                           <td className="px-2.5 py-2 text-right font-mono text-muted-foreground">৳{item.unitPrice}</td>
                           <td className="px-2.5 py-2 text-right font-mono font-bold text-foreground">

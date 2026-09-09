@@ -494,7 +494,7 @@ export default function ReportsPage() {
           const match =
             st.productName.toLowerCase().includes(q) ||
             st.productCode.toLowerCase().includes(q) ||
-            st.category.toLowerCase().includes(q) ||
+            st.packSize.toLowerCase().includes(q) ||
             depName.toLowerCase().includes(q)
           if (!match) return
         }
@@ -690,11 +690,9 @@ export default function ReportsPage() {
       const headers = [
         "Product Name",
         "Product Code",
-        "Category",
         "Pack Size",
         "Depot",
         "Available Stock",
-        "Unit",
         "Min Threshold",
         "Buy Price (BDT)",
         "Sell Price (BDT)",
@@ -703,11 +701,9 @@ export default function ReportsPage() {
       const rows = filteredStockRows.map((r) => [
         `"${r.item.productName}"`,
         `"${r.item.productCode}"`,
-        `"${r.item.category}"`,
         `"${r.item.packSize}"`,
         `"${r.depotName}"`,
         r.item.quantity,
-        `"${r.item.unit}"`,
         r.item.minThreshold,
         r.product?.buyPrice || 0,
         r.product?.sellPrice || r.product?.price || 0,
@@ -951,7 +947,7 @@ export default function ReportsPage() {
                 <select
                   value={productFilter}
                   onChange={(e) => setProductFilter(e.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                  className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none cursor-pointer"
                 >
                   <option value="all">All Catalog Products ({catalog.length})</option>
                   {catalog.map((p) => (
@@ -1232,11 +1228,11 @@ export default function ReportsPage() {
             </p>
           </div>
           <div className="rounded-lg border border-border/80 bg-card p-3 shadow-2xs">
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Total Units Restocked
-            </span>
-            <p className="mt-1 font-mono text-lg font-bold text-foreground">
-              {reportMetrics.totalReturnedUnits} units
+            <p className="text-[11px] font-medium text-muted-foreground">
+              Total Restocked Quantity
+            </p>
+            <p className="mt-1 font-mono text-2xl font-bold text-purple-600">
+              {reportMetrics.totalReturnedUnits}
             </p>
           </div>
           <div className="rounded-lg border border-border/80 bg-card p-3 shadow-2xs">
@@ -1290,11 +1286,11 @@ export default function ReportsPage() {
       {activeReport === "stock" && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-lg border border-border/80 bg-card p-3 shadow-2xs">
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Total Stock Units
-            </span>
-            <p className="mt-1 font-mono text-lg font-bold text-foreground">
-              {reportMetrics.totalStockUnits.toLocaleString()} units
+            <p className="text-[11px] font-medium text-muted-foreground">
+              Total Stock Quantity
+            </p>
+            <p className="mt-1 font-mono text-2xl font-bold text-foreground">
+              {reportMetrics.totalStockUnits.toLocaleString()}
             </p>
           </div>
           <div className="rounded-lg border border-border/80 bg-card p-3 shadow-2xs">
@@ -1651,11 +1647,11 @@ export default function ReportsPage() {
                           </td>
                           <td className="px-3 py-2.5 text-muted-foreground">{ret.depotName}</td>
                           <td className="px-3 py-2.5">
-                            {ret.items.map((it) => (
-                              <p key={it.productId} className="text-foreground">
-                                {it.productName} ({it.returnedQuantity} {it.unit})
-                              </p>
-                            ))}
+                            {ret.items.map((it, idx) => (
+                                <span key={idx} className="block text-foreground font-medium">
+                                  {it.productName} ({it.returnedQuantity})
+                                </span>
+                              ))}
                           </td>
                           <td className="px-3 py-2.5 text-center font-mono font-bold text-amber-600">
                             {ret.totalReturnedQuantity}
@@ -1775,21 +1771,20 @@ export default function ReportsPage() {
                 <thead>
                   <tr className="border-b border-border/70 bg-muted/30 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                     <th className="px-3.5 py-2.5">Product SKU</th>
-                    <th className="px-3 py-2.5">Category</th>
-                    <th className="px-3 py-2.5">Depot Location</th>
-                    <th className="px-3 py-2.5">Pack Size</th>
-                    <th className="px-3 py-2.5 text-center">Available Stock</th>
-                    <th className="px-3 py-2.5 text-center">Threshold</th>
-                    <th className="px-3 py-2.5 text-right">Buy Price</th>
-                    <th className="px-3 py-2.5 text-right">Sell Price</th>
-                    <th className="px-3 py-2.5 text-right">Stock Valuation</th>
+                    <th className="px-3.5 py-2.5">Depot Location</th>
+                    <th className="px-3.5 py-2.5">Pack Size</th>
+                    <th className="px-3.5 py-2.5 text-center">Available Stock</th>
+                    <th className="px-3.5 py-2.5 text-center">Threshold</th>
+                    <th className="px-3.5 py-2.5 text-right">Buy Price</th>
+                    <th className="px-3.5 py-2.5 text-right">Sell Price</th>
+                    <th className="px-3.5 py-2.5 text-right">Stock Valuation</th>
                     <th className="px-3.5 py-2.5 text-center">Stock Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
                   {filteredStockRows.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-10 text-center text-xs text-muted-foreground">
+                      <td colSpan={9} className="py-10 text-center text-xs text-muted-foreground">
                         <AlertCircle className="mx-auto size-7 text-muted-foreground mb-2 opacity-50" />
                         No depot stock rows match current filter options.
                       </td>
@@ -1809,11 +1804,10 @@ export default function ReportsPage() {
                               <p className="font-semibold text-foreground">{row.item.productName}</p>
                               <p className="font-mono text-[10px] text-muted-foreground">{row.item.productCode}</p>
                             </td>
-                            <td className="px-3 py-2.5 text-muted-foreground">{row.item.category}</td>
-                            <td className="px-3 py-2.5 font-medium text-foreground">{row.depotName}</td>
-                            <td className="px-3 py-2.5 text-muted-foreground">{row.item.packSize}</td>
-                            <td className="px-3 py-2.5 text-center font-mono font-bold text-foreground">
-                              {row.item.quantity} {row.item.unit}
+                            <td className="px-3.5 py-2.5 font-medium text-foreground">{row.depotName}</td>
+                            <td className="px-3.5 py-2.5 text-muted-foreground font-mono">{row.item.packSize}</td>
+                            <td className="px-3.5 py-2.5 text-center font-mono font-bold text-foreground">
+                              {row.item.quantity}
                             </td>
                             <td className="px-3 py-2.5 text-center font-mono text-muted-foreground">
                               {row.item.minThreshold}

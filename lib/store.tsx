@@ -32,16 +32,16 @@ import {
 import { formatDateTime } from "@/lib/utils"
 
 const STORAGE_KEYS = {
-  ORDERS: "eakin_erp_orders_v1",
-  CUSTOMERS: "eakin_erp_customers_v1",
-  OFFICERS: "eakin_erp_officers_v1",
-  DEPOT_STOCKS: "eakin_erp_depot_stocks_v1",
-  COLLECTIONS: "eakin_erp_collections_v1",
-  PRODUCT_RETURNS: "eakin_erp_returns_v1",
-  CURRENT_OFFICER_ID: "eakin_erp_current_officer_id_v1",
-  CURRENT_AM_ID: "eakin_erp_current_am_id_v1",
-  CURRENT_RM_ID: "eakin_erp_current_rm_id_v1",
-  CURRENT_ROLE: "eakin_erp_current_role_v1",
+  ORDERS: "eakin_erp_orders_v2",
+  CUSTOMERS: "eakin_erp_customers_v2",
+  OFFICERS: "eakin_erp_officers_v2",
+  DEPOT_STOCKS: "eakin_erp_depot_stocks_v2",
+  COLLECTIONS: "eakin_erp_collections_v2",
+  PRODUCT_RETURNS: "eakin_erp_returns_v2",
+  CURRENT_OFFICER_ID: "eakin_erp_current_officer_id_v2",
+  CURRENT_AM_ID: "eakin_erp_current_am_id_v2",
+  CURRENT_RM_ID: "eakin_erp_current_rm_id_v2",
+  CURRENT_ROLE: "eakin_erp_current_role_v2",
 }
 
 export type StaffRole = "admin" | "officer" | "am" | "rm"

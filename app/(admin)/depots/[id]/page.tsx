@@ -99,7 +99,7 @@ export default function SingleDepotPage() {
   }
 
   // Stock Metrics for current depot
-  const totalUnits = React.useMemo(() => {
+  const totalQuantity = React.useMemo(() => {
     return currentDepotStockItems.reduce((sum, item) => sum + item.quantity, 0)
   }, [currentDepotStockItems])
 
@@ -115,7 +115,7 @@ export default function SingleDepotPage() {
       (item) =>
         item.productName.toLowerCase().includes(q) ||
         item.productCode.toLowerCase().includes(q) ||
-        item.category.toLowerCase().includes(q)
+        item.packSize.toLowerCase().includes(q)
     )
   }, [currentDepotStockItems, searchProductQuery])
 
@@ -288,9 +288,7 @@ export default function SingleDepotPage() {
         productId: prodInfo.id,
         productCode: prodInfo.code,
         productName: prodInfo.name,
-        category: prodInfo.category,
         packSize: prodInfo.packSize,
-        unit: prodInfo.unit,
         quantity: qty,
       })
     }
@@ -326,10 +324,8 @@ export default function SingleDepotPage() {
             productId: item.productId,
             productCode: item.productCode,
             productName: item.productName,
-            category: item.category,
             packSize: item.packSize,
             quantity: item.quantity,
-            unit: item.unit,
             minThreshold: 20,
           })
         }
@@ -462,12 +458,11 @@ export default function SingleDepotPage() {
               </p>
             </div>
             <div className="rounded border border-border/60 bg-muted/30 p-3">
-              <span className="text-[11px] font-medium text-muted-foreground">
-                Total Stock Units
-              </span>
-              <p className="mt-0.5 text-lg font-bold text-primary">
-                {totalUnits.toLocaleString()}{" "}
-                <span className="text-xs font-normal text-muted-foreground">Units</span>
+              <p className="text-xs text-muted-foreground">
+                Total Stock Quantity
+              </p>
+              <p className="mt-1 font-mono text-2xl font-bold text-foreground">
+                {totalQuantity.toLocaleString()}
               </p>
             </div>
             <div className="col-span-2 rounded border border-border/60 bg-muted/30 p-3 sm:col-span-1">
@@ -523,9 +518,6 @@ export default function SingleDepotPage() {
                     Product Name
                   </th>
                   <th scope="col" className="px-4 py-3">
-                    Category
-                  </th>
-                  <th scope="col" className="px-4 py-3">
                     Pack Size
                   </th>
                   <th scope="col" className="px-4 py-3 text-right">
@@ -558,16 +550,8 @@ export default function SingleDepotPage() {
                           {item.productName}
                         </td>
 
-                        {/* Category */}
-                        <td className="px-4 py-3 text-muted-foreground">
-                          <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[11px]">
-                            <Tag className="size-2.5 text-muted-foreground" />
-                            {item.category}
-                          </span>
-                        </td>
-
                         {/* Pack Size */}
-                        <td className="px-4 py-3 text-muted-foreground">
+                        <td className="px-4 py-3 text-muted-foreground font-mono text-[11px]">
                           {item.packSize}
                         </td>
 
@@ -575,9 +559,6 @@ export default function SingleDepotPage() {
                         <td className="px-4 py-3 text-right">
                           <span className="font-mono text-sm font-bold text-foreground">
                             {item.quantity.toLocaleString()}
-                          </span>{" "}
-                          <span className="text-[11px] text-muted-foreground">
-                            {item.unit}s
                           </span>
                         </td>
                       </tr>
@@ -586,7 +567,7 @@ export default function SingleDepotPage() {
                 ) : (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={5}
                       className="px-4 py-8 text-center text-xs text-muted-foreground"
                     >
                       No products found.
@@ -1022,7 +1003,7 @@ export default function SingleDepotPage() {
                                   const itemAvail = getAvailableStock(sourceDepotId, prod.id)
                                   return (
                                     <option key={prod.id} value={prod.id}>
-                                      {prod.name} ({prod.code}) — [{itemAvail} {prod.unit}s available]
+                                      {prod.name} ({prod.code} - {prod.packSize}) — [{itemAvail} available]
                                     </option>
                                   )
                                 })}
@@ -1038,10 +1019,7 @@ export default function SingleDepotPage() {
                                     : "text-destructive"
                                 }`}
                               >
-                                {available}{" "}
-                                <span className="text-[10px] font-normal text-muted-foreground">
-                                  {currentProduct?.unit || "Unit"}s
-                                </span>
+                                {available}
                               </span>
                             </td>
 
@@ -1207,9 +1185,6 @@ export default function SingleDepotPage() {
                         Product Name
                       </th>
                       <th scope="col" className="px-3 py-2.5">
-                        Category
-                      </th>
-                      <th scope="col" className="px-3 py-2.5">
                         Pack Size
                       </th>
                       <th scope="col" className="px-3 py-2.5 text-right">
@@ -1229,14 +1204,11 @@ export default function SingleDepotPage() {
                         <td className="px-3 py-2 font-semibold text-foreground">
                           {item.productName}
                         </td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {item.category}
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground">
+                        <td className="px-3 py-2 text-muted-foreground font-mono">
                           {item.packSize}
                         </td>
                         <td className="px-3 py-2 text-right font-mono font-bold text-foreground">
-                          {item.quantity.toLocaleString()} {item.unit}s
+                          {item.quantity.toLocaleString()}
                         </td>
                       </tr>
                     ))}
@@ -1255,7 +1227,7 @@ export default function SingleDepotPage() {
                 <span>
                   Total Quantity:{" "}
                   <strong className="font-mono text-primary">
-                    {selectedTransferDetails.totalQuantity.toLocaleString()} Units
+                    {selectedTransferDetails.totalQuantity.toLocaleString()}
                   </strong>
                 </span>
               </div>

@@ -89,7 +89,6 @@ export default function StockManagementPage() {
 
   // Filters State for Depot Stock Tab
   const [selectedDepotFilter, setSelectedDepotFilter] = React.useState<string>("all")
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = React.useState<string>("all")
   const [searchStockQuery, setSearchStockQuery] = React.useState<string>("")
 
   // Modals
@@ -104,7 +103,6 @@ export default function StockManagementPage() {
     productCode: string
     packSize: string
     quantity: number
-    unit: string
   } | null>(null)
   const [selectedTransferDetails, setSelectedTransferDetails] = React.useState<StockTransfer | null>(null)
 
@@ -145,10 +143,8 @@ export default function StockManagementPage() {
       productId: string
       productCode: string
       productName: string
-      category: string
       packSize: string
       quantity: number
-      unit: string
       minThreshold: number
     }> = []
 
@@ -162,10 +158,8 @@ export default function StockManagementPage() {
           productId: item.productId,
           productCode: item.productCode,
           productName: item.productName,
-          category: item.category,
           packSize: item.packSize,
           quantity: item.quantity,
-          unit: item.unit,
           minThreshold: item.minThreshold,
         })
       })
@@ -173,13 +167,6 @@ export default function StockManagementPage() {
 
     return list
   }, [depots, depotStocks])
-
-  // Categories list for filter
-  const categoriesList = React.useMemo(() => {
-    const set = new Set<string>()
-    catalog.forEach((c) => set.add(c.category))
-    return Array.from(set)
-  }, [catalog])
 
   // Filtered Depot Stock Items (RM & AM are locked to their assigned depot)
   const filteredDepotStock = React.useMemo(() => {
@@ -191,25 +178,22 @@ export default function StockManagementPage() {
       } else if (selectedDepotFilter !== "all" && item.depotId !== selectedDepotFilter) {
         return false
       }
-      if (selectedCategoryFilter !== "all" && item.category !== selectedCategoryFilter) {
-        return false
-      }
       if (searchStockQuery.trim()) {
         const q = searchStockQuery.toLowerCase().trim()
         const matchName = item.productName.toLowerCase().includes(q)
         const matchCode = item.productCode.toLowerCase().includes(q)
         const matchDepot = item.depotName.toLowerCase().includes(q)
-        const matchCategory = item.category.toLowerCase().includes(q)
-        if (!matchName && !matchCode && !matchDepot && !matchCategory) {
+        const matchPack = item.packSize.toLowerCase().includes(q)
+        if (!matchName && !matchCode && !matchDepot && !matchPack) {
           return false
         }
       }
       return true
     })
-  }, [allDepotStockList, isRestrictedStaff, assignedDepot, selectedDepotFilter, selectedCategoryFilter, searchStockQuery])
+  }, [allDepotStockList, isRestrictedStaff, assignedDepot, selectedDepotFilter, searchStockQuery])
 
-  // Metrics (Reflect assigned depot units for RM/AM)
-  const totalStockUnits = React.useMemo(() => {
+  // Metrics (Reflect assigned depot items for RM/AM)
+  const totalStockQuantity = React.useMemo(() => {
     if (isRestrictedStaff && assignedDepot) {
       return allDepotStockList
         .filter((item) => item.depotId === assignedDepot.id)
@@ -342,10 +326,8 @@ export default function StockManagementPage() {
             productId: prod.id,
             productCode: prod.code,
             productName: prod.name,
-            category: prod.category,
             packSize: prod.packSize,
             quantity: qty,
-            unit: prod.unit,
             minThreshold: 20,
           })
           setMovements((mPrev) => [
@@ -476,9 +458,7 @@ export default function StockManagementPage() {
           productId: prod.id,
           productCode: prod.code,
           productName: prod.name,
-          category: prod.category,
           packSize: prod.packSize,
-          unit: prod.unit,
           quantity: qty,
         })
       }
@@ -567,10 +547,8 @@ export default function StockManagementPage() {
             productId: transferItem.productId,
             productCode: transferItem.productCode,
             productName: transferItem.productName,
-            category: transferItem.category,
             packSize: transferItem.packSize,
             quantity: transferItem.quantity,
-            unit: transferItem.unit,
             minThreshold: 20,
           })
           setMovements((mPrev) => [
@@ -653,10 +631,8 @@ export default function StockManagementPage() {
           productId: targetProd.id,
           productCode: targetProd.code,
           productName: targetProd.name,
-          category: targetProd.category,
           packSize: targetProd.packSize,
           quantity: qty,
-          unit: targetProd.unit,
           minThreshold: 20,
         })
         setMovements((mPrev) => [
@@ -780,12 +756,12 @@ export default function StockManagementPage() {
                     : `Depot Inventory (${filteredDepotStock.length} items)`}
                 </CardTitle>
                 <div className="text-xs text-muted-foreground">
-                  Total Units: <strong className="text-foreground font-mono">{totalStockUnits.toLocaleString()}</strong>
+                  Total Stock Qty: <strong className="text-foreground font-mono">{totalStockQuantity.toLocaleString()}</strong>
                 </div>
               </div>
 
               {/* Filters */}
-              <div className={`grid grid-cols-1 gap-2.5 ${isRestrictedStaff ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
+              <div className={`grid grid-cols-1 gap-2.5 ${isRestrictedStaff ? "sm:grid-cols-1" : "sm:grid-cols-2"}`}>
                 {/* 1. Depot Filter - Visible ONLY for Admin */}
                 {!isRestrictedStaff && (
                   <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
@@ -806,32 +782,14 @@ export default function StockManagementPage() {
                   </div>
                 )}
 
-                {/* 2. Category Filter */}
-                <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                  <Layers className="size-3.5 shrink-0 text-muted-foreground" />
-                  <select
-                    aria-label="Filter by Category"
-                    value={selectedCategoryFilter}
-                    onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-                    className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
-                  >
-                    <option value="all">All Categories</option>
-                    {categoriesList.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 3. Search Bar */}
+                {/* 2. Search Bar */}
                 <div className="relative">
                   <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     type="search"
                     value={searchStockQuery}
                     onChange={(e) => setSearchStockQuery(e.target.value)}
-                    placeholder={isRestrictedStaff ? "Search product, code..." : "Search product, code, depot..."}
+                    placeholder={isRestrictedStaff ? "Search product, code, pack size..." : "Search product, code, depot, pack size..."}
                     className="h-9 pl-8 text-xs"
                   />
                 </div>
@@ -902,7 +860,7 @@ export default function StockManagementPage() {
 
                           {/* Available Qty */}
                           <td className="px-4 py-3 text-right font-mono font-bold text-sm text-foreground">
-                            {item.quantity.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">{item.unit}s</span>
+                            {item.quantity.toLocaleString()}
                           </td>
                         </tr>
                       )
@@ -992,7 +950,7 @@ export default function StockManagementPage() {
                       </td>
 
                       <td className="px-4 py-3 text-right font-mono font-bold text-foreground">
-                        {tx.totalQuantity.toLocaleString()} units
+                        {tx.totalQuantity.toLocaleString()}
                       </td>
 
                       <td className="px-4 py-3 text-right">
@@ -1681,7 +1639,7 @@ export default function StockManagementPage() {
               <div>
                 <span className="text-[10px] text-muted-foreground uppercase">Current Stock</span>
                 <div className="font-mono font-bold text-foreground">
-                  {selectedDrilldownItem.quantity} {selectedDrilldownItem.unit}s
+                  {selectedDrilldownItem.quantity}
                 </div>
               </div>
             </div>
@@ -1812,7 +1770,7 @@ export default function StockManagementPage() {
                         <td className="px-3 py-2 font-semibold text-foreground">{item.productName}</td>
                         <td className="px-3 py-2 text-muted-foreground font-mono">{item.packSize}</td>
                         <td className="px-3 py-2 text-right font-mono font-bold text-foreground">
-                          {item.quantity} {item.unit}s
+                          {item.quantity}
                         </td>
                       </tr>
                     ))}
@@ -1823,7 +1781,7 @@ export default function StockManagementPage() {
 
             <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
               <div className="text-xs text-muted-foreground">
-                Total Units Transferred: <strong className="font-mono text-foreground">{selectedTransferDetails.totalQuantity}</strong>
+                Total Quantity Transferred: <strong className="font-mono text-foreground">{selectedTransferDetails.totalQuantity}</strong>
               </div>
               <Button
                 type="button"

@@ -750,7 +750,7 @@ export default function DashboardPage() {
                       <p className="font-mono text-[10px] text-muted-foreground">{item.productCode} &bull; {item.packSize}</p>
                     </div>
                     <span className="rounded-xs border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] font-bold text-amber-700 dark:text-amber-300">
-                      {item.quantity} {item.unit}
+                      Qty: {item.quantity}
                     </span>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground border-t border-amber-500/20 pt-1.5">
@@ -1114,7 +1114,7 @@ export default function DashboardPage() {
                   {selectedInvoice.bonusItems && selectedInvoice.bonusItems.length > 0 && (
                     <tr className="bg-primary/5">
                       <td colSpan={5} className="px-3 py-1.5 text-[11px] font-medium text-primary">
-                        Bonus Units Approved: {selectedInvoice.bonusItems.map(b => `${b.productName} (${b.quantity} ${b.unit})`).join(", ")}
+                        Bonus Approved: {selectedInvoice.bonusItems.map(b => `${b.productName} (${b.quantity})`).join(", ")}
                       </td>
                     </tr>
                   )}
