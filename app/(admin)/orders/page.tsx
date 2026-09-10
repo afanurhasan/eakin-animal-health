@@ -702,7 +702,7 @@ export default function OrdersPage() {
               {/* Brand Header */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border pb-5 gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-44 items-center justify-center rounded-md border border-border/60 bg-white p-2 shadow-2xs dark:bg-white/95">
+                  <div className="flex items-center justify-center">
                     <Image
                       src="/logo.jpeg"
                       alt="Eakin Animal Health Logo"
@@ -1026,7 +1026,7 @@ export default function OrdersPage() {
                 {/* Brand Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border pb-4 gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-11 w-40 items-center justify-center rounded-md border border-border/60 bg-white p-2 shadow-2xs dark:bg-white/95">
+                    <div className="flex items-center justify-center">
                       <Image
                         src="/logo.jpeg"
                         alt="Eakin Animal Health Logo"

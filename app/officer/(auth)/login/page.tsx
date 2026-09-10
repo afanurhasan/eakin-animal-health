@@ -151,13 +151,13 @@ export default function OfficerLoginPage() {
         <Card className="w-full border-border/80 bg-card shadow-sm">
           {/* Card Header & Brand Logo Area */}
           <CardHeader className="space-y-3 pb-3 text-center">
-            <div className="mx-auto flex w-full max-w-[190px] items-center justify-center rounded-md border border-border/60 bg-white p-2.5 shadow-xs dark:bg-white/95">
+            <div className="mx-auto flex items-center justify-center">
               <Image
                 src="/logo.jpeg"
                 alt="Eakin Animal Health Logo"
                 width={180}
                 height={70}
-                className="h-14 w-auto object-contain"
+                className="h-16 w-auto object-contain"
                 priority
               />
             </div>

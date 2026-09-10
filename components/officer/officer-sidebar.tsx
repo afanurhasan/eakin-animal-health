@@ -177,22 +177,20 @@ export function OfficerSidebar({ isOpen, onClose }: OfficerSidebarProps) {
         )}
       >
         {/* Brand Header */}
-        <div className="flex h-16 shrink-0 items-center justify-between border-b border-sidebar-border px-4">
+        <div className="relative flex h-16 shrink-0 items-center justify-center border-b border-sidebar-border px-4">
           <Link
             href={homeHref}
             onClick={onClose}
-            className="flex items-center transition-opacity hover:opacity-90"
+            className="flex items-center justify-center transition-opacity hover:opacity-90"
           >
-            <div className="flex h-10 w-36 items-center justify-center rounded-md border border-sidebar-border/60 bg-white px-2 py-1 shadow-2xs dark:bg-white/95">
-              <Image
-                src="/logo.jpeg"
-                alt="Eakin Animal Health Logo"
-                width={130}
-                height={35}
-                className="h-8 w-auto object-contain"
-                priority
-              />
-            </div>
+            <Image
+              src="/logo.jpeg"
+              alt="Eakin Animal Health Logo"
+              width={140}
+              height={40}
+              className="h-9 w-auto object-contain"
+              priority
+            />
           </Link>
 
           {/* Close button on mobile */}
@@ -202,7 +200,7 @@ export function OfficerSidebar({ isOpen, onClose }: OfficerSidebarProps) {
             size="icon-xs"
             onClick={onClose}
             aria-label="Close sidebar"
-            className="text-muted-foreground hover:text-foreground lg:hidden"
+            className="absolute right-3 text-muted-foreground hover:text-foreground lg:hidden"
           >
             <X className="size-4" />
           </Button>

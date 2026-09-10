@@ -602,8 +602,8 @@ export default function OfficerCustomerDetailPage() {
             <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-card text-card-foreground">
               <div className="flex items-center justify-between border-b border-border pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-40 items-center justify-center rounded-md border border-border/60 bg-white p-2 shadow-2xs dark:bg-white/95">
-                    <Image src="/logo.jpeg" alt="Logo" width={150} height={40} className="h-9 w-auto object-contain" priority />
+                  <div className="flex items-center justify-center">
+                    <Image src="/logo.jpeg" alt="Logo" width={150} height={40} className="h-10 w-auto object-contain" priority />
                   </div>
                   <div>
                     <h2 className="text-sm font-bold text-foreground">Eakin Animal Health Ltd.</h2>
