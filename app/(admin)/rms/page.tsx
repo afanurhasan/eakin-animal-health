@@ -16,22 +16,29 @@ import {
   ArrowRight,
   Mail,
   Phone,
+  Eye,
+  EyeOff,
+  KeyRound,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useAppState } from "@/lib/store"
 import {
-  initialRMs,
-  initialAreasWithDepot,
   type RMItem,
   type AreaItem,
 } from "@/lib/mock-data"
 
 export default function RegionalManagersPage() {
-  const [rms, setRms] = React.useState<RMItem[]>(initialRMs)
-  const [areas] = React.useState<AreaItem[]>(initialAreasWithDepot)
+  const {
+    rms,
+    areas,
+    addRM,
+    updateRM,
+    deleteRM,
+  } = useAppState()
 
   // Filter States
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -41,12 +48,14 @@ export default function RegionalManagersPage() {
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
   const [editingRM, setEditingRM] = React.useState<RMItem | null>(null)
   const [deletingRM, setDeletingRM] = React.useState<RMItem | null>(null)
+  const [showPinModal, setShowPinModal] = React.useState(false)
 
   // Form input state
   const [formData, setFormData] = React.useState({
     code: "",
     name: "",
     phone: "",
+    pin: "123456",
     email: "",
     areaId: areas[0]?.id || "1",
   })
@@ -82,6 +91,7 @@ export default function RegionalManagersPage() {
     code?: string
     name?: string
     phone?: string
+    pin?: string
     email?: string
     areaId?: string
   }>({})
@@ -93,9 +103,11 @@ export default function RegionalManagersPage() {
       code: `RM-${String(nextCodeNumber).padStart(3, "0")}`,
       name: "",
       phone: "",
+      pin: "123456",
       email: "",
       areaId: areas[0]?.id || "1",
     })
+    setShowPinModal(false)
     setFormError("")
     setFormErrors({})
     setIsCreateOpen(true)
@@ -108,9 +120,11 @@ export default function RegionalManagersPage() {
       code: rm.code,
       name: rm.name,
       phone: rm.phone,
+      pin: rm.pin || "123456",
       email: rm.email || "",
       areaId: rm.areaId,
     })
+    setShowPinModal(false)
     setFormError("")
     setFormErrors({})
   }
@@ -122,6 +136,7 @@ export default function RegionalManagersPage() {
       code?: string
       name?: string
       phone?: string
+      pin?: string
       email?: string
       areaId?: string
     } = {}
@@ -134,6 +149,9 @@ export default function RegionalManagersPage() {
     }
     if (!formData.phone.trim()) {
       errors.phone = "This field is required."
+    }
+    if (!formData.pin || formData.pin.length !== 6 || !/^\d{6}$/.test(formData.pin)) {
+      errors.pin = "PIN must be exactly 6 numeric digits."
     }
     if (!formData.areaId) {
       errors.areaId = "This field is required."
@@ -155,36 +173,29 @@ export default function RegionalManagersPage() {
     const areaName = assignedArea ? assignedArea.name : "Unassigned"
 
     if (editingRM) {
-      setRms((prev) =>
-        prev.map((item) =>
-          item.id === editingRM.id
-            ? {
-                ...item,
-                code: formData.code.trim().toUpperCase(),
-                name: formData.name.trim(),
-                phone: formData.phone.trim(),
-                email: formData.email.trim(),
-                areaId: formData.areaId,
-                areaName,
-              }
-            : item
-        )
-      )
-      setEditingRM(null)
-      showToast("Regional Manager updated successfully.")
-    } else {
-      const newRM: RMItem = {
-        id: `rm-${Date.now()}`,
-        code: formData.code.trim().toUpperCase() || `RM-${String(rms.length + 1).padStart(3, "0")}`,
+      updateRM(editingRM.id, {
+        code: formData.code.trim().toUpperCase(),
         name: formData.name.trim(),
         phone: formData.phone.trim(),
+        pin: formData.pin.trim(),
         email: formData.email.trim(),
         areaId: formData.areaId,
         areaName,
-      }
-      setRms((prev) => [newRM, ...prev])
+      })
+      setEditingRM(null)
+      showToast("Regional Manager updated successfully.")
+    } else {
+      addRM({
+        code: formData.code.trim().toUpperCase() || `RM-${String(rms.length + 1).padStart(3, "0")}`,
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        pin: formData.pin.trim() || "123456",
+        email: formData.email.trim(),
+        areaId: formData.areaId,
+        areaName,
+      })
       setIsCreateOpen(false)
-      showToast("New Regional Manager added successfully.")
+      showToast("New Regional Manager added successfully with 6-digit login PIN.")
     }
     setFormErrors({})
     setFormError("")
@@ -193,7 +204,7 @@ export default function RegionalManagersPage() {
   // Handle Delete
   const handleConfirmDelete = () => {
     if (!deletingRM) return
-    setRms((prev) => prev.filter((item) => item.id !== deletingRM.id))
+    deleteRM(deletingRM.id)
     setDeletingRM(null)
     showToast("Regional Manager deleted successfully.")
   }
@@ -507,11 +518,55 @@ export default function RegionalManagersPage() {
                     setFormData((prev) => ({ ...prev, phone: e.target.value }))
                     if (formErrors.phone) setFormErrors((prev) => ({ ...prev, phone: undefined }))
                   }}
-                  placeholder="e.g. +880 1712-111222"
+                  placeholder="e.g. 01712-111222"
                   className={`text-xs font-mono ${formErrors.phone ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 />
                 {formErrors.phone && (
                   <p className="text-[11px] text-destructive">{formErrors.phone}</p>
+                )}
+              </div>
+
+              {/* Login PIN (6-Digit) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="rmPin" className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <KeyRound className="size-3.5 text-primary" />
+                    <span>6-Digit Login PIN</span>
+                  </Label>
+                  <span className="text-[10px] text-muted-foreground">Default: 123456</span>
+                </div>
+                <div className="relative">
+                  <Input
+                    id="rmPin"
+                    name="rmPin"
+                    type={showPinModal ? "text" : "password"}
+                    maxLength={6}
+                    value={formData.pin}
+                    onChange={(e) => {
+                      const numeric = e.target.value.replace(/\D/g, "").slice(0, 6)
+                      setFormData((prev) => ({ ...prev, pin: numeric }))
+                      if (formErrors.pin) setFormErrors((prev) => ({ ...prev, pin: undefined }))
+                    }}
+                    placeholder="e.g. 123456"
+                    className={`text-xs font-mono tracking-wider pr-9 ${formErrors.pin ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => setShowPinModal(!showPinModal)}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                    aria-label={showPinModal ? "Hide PIN" : "Show PIN"}
+                  >
+                    {showPinModal ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  </Button>
+                </div>
+                {formErrors.pin ? (
+                  <p className="text-[11px] text-destructive">{formErrors.pin}</p>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground">
+                    Regional Manager will use this 6-digit PIN and Phone Number to log into the field portal.
+                  </p>
                 )}
               </div>
 

@@ -35,6 +35,8 @@ const STORAGE_KEYS = {
   ORDERS: "eakin_erp_orders_v2",
   CUSTOMERS: "eakin_erp_customers_v2",
   OFFICERS: "eakin_erp_officers_v2",
+  AMS: "eakin_erp_ams_v2",
+  RMS: "eakin_erp_rms_v2",
   DEPOT_STOCKS: "eakin_erp_depot_stocks_v2",
   COLLECTIONS: "eakin_erp_collections_v2",
   PRODUCT_RETURNS: "eakin_erp_returns_v2",
@@ -83,6 +85,23 @@ interface AppStateContextType {
   loginOfficer: (emailOrCode: string) => SalesOfficerItem | null
   logoutOfficer: () => void
   logoutStaff: () => void
+  verifyAndChangePin: (
+    role: StaffRole,
+    id: string,
+    currentPin: string,
+    newPin: string
+  ) => { success: boolean; message: string }
+
+  // Staff Mutations (Admin)
+  addOfficer: (off: Omit<SalesOfficerItem, "id">) => SalesOfficerItem
+  updateOfficer: (id: string, updates: Partial<SalesOfficerItem>) => void
+  deleteOfficer: (id: string) => void
+  addAM: (am: Omit<AMItem, "id">) => AMItem
+  updateAM: (id: string, updates: Partial<AMItem>) => void
+  deleteAM: (id: string) => void
+  addRM: (rm: Omit<RMItem, "id">) => RMItem
+  updateRM: (id: string, updates: Partial<RMItem>) => void
+  deleteRM: (id: string) => void
 
   // Order Mutations
   createOrder: (orderData: Omit<Order, "id" | "code" | "date" | "status">) => Order
@@ -110,17 +129,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   // Core State
   const [orders, setOrders] = React.useState<Order[]>(initialOrders)
   const [customers, setCustomers] = React.useState<CustomerItem[]>(initialCustomers)
-  const [officers] = React.useState<SalesOfficerItem[]>(initialOfficers)
+  const [officers, setOfficers] = React.useState<SalesOfficerItem[]>(initialOfficers)
   const [depots] = React.useState<Depot[]>(initialDepots)
   const [depotStocks, setDepotStocks] = React.useState<Record<string, DepotStockItem[]>>(initialDepotStocks)
   const [areas] = React.useState<AreaItem[]>(initialAreasWithDepot)
-  const [rms] = React.useState<RMItem[]>(initialRMs)
-  const [ams] = React.useState<AMItem[]>(initialAMs)
+  const [rms, setRms] = React.useState<RMItem[]>(initialRMs)
+  const [ams, setAms] = React.useState<AMItem[]>(initialAMs)
   const [catalog] = React.useState<Product[]>(productCatalog)
   const [collections, setCollections] = React.useState<CollectionItem[]>(initialCollections)
   const [productReturns, setProductReturns] = React.useState<ProductReturnItem[]>(initialProductReturns)
-  const [transfers] = React.useState<StockTransfer[]>(initialTransfers)
-  const [movements] = React.useState<StockMovement[]>(initialStockMovements)
+  const [transfers, setTransfers] = React.useState<StockTransfer[]>(initialTransfers)
+  const [movements, setMovements] = React.useState<StockMovement[]>(initialStockMovements)
 
   // Role and Session State
   const [currentRole, setCurrentRole] = React.useState<StaffRole>("officer")
@@ -136,6 +155,25 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
       const storedCustomers = localStorage.getItem(STORAGE_KEYS.CUSTOMERS)
       if (storedCustomers) setCustomers(JSON.parse(storedCustomers))
+
+      const storedOfficers = localStorage.getItem(STORAGE_KEYS.OFFICERS)
+      if (storedOfficers) {
+        const parsedOfficers: SalesOfficerItem[] = JSON.parse(storedOfficers)
+        // Ensure every officer has a pin
+        setOfficers(parsedOfficers.map(o => ({ ...o, pin: o.pin || "123456" })))
+      }
+
+      const storedAMs = localStorage.getItem(STORAGE_KEYS.AMS)
+      if (storedAMs) {
+        const parsedAMs: AMItem[] = JSON.parse(storedAMs)
+        setAms(parsedAMs.map(a => ({ ...a, pin: a.pin || "123456" })))
+      }
+
+      const storedRMs = localStorage.getItem(STORAGE_KEYS.RMS)
+      if (storedRMs) {
+        const parsedRMs: RMItem[] = JSON.parse(storedRMs)
+        setRms(parsedRMs.map(r => ({ ...r, pin: r.pin || "123456" })))
+      }
 
       const storedStocks = localStorage.getItem(STORAGE_KEYS.DEPOT_STOCKS)
       if (storedStocks) setDepotStocks(JSON.parse(storedStocks))
@@ -182,6 +220,33 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (!isLoaded) return
     try {
+      localStorage.setItem(STORAGE_KEYS.OFFICERS, JSON.stringify(officers))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [officers, isLoaded])
+
+  React.useEffect(() => {
+    if (!isLoaded) return
+    try {
+      localStorage.setItem(STORAGE_KEYS.AMS, JSON.stringify(ams))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [ams, isLoaded])
+
+  React.useEffect(() => {
+    if (!isLoaded) return
+    try {
+      localStorage.setItem(STORAGE_KEYS.RMS, JSON.stringify(rms))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [rms, isLoaded])
+
+  React.useEffect(() => {
+    if (!isLoaded) return
+    try {
       localStorage.setItem(STORAGE_KEYS.CURRENT_OFFICER_ID, currentOfficerId)
       localStorage.setItem(STORAGE_KEYS.CURRENT_AM_ID, currentAMId)
       localStorage.setItem(STORAGE_KEYS.CURRENT_RM_ID, currentRMId)
@@ -209,19 +274,28 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     (phoneOrCode: string, pin: string): StaffLoginResult => {
       const raw = phoneOrCode.trim().toLowerCase()
       const digits = phoneOrCode.replace(/\D/g, "")
+      const cleanPin = pin.trim()
 
-      if (!pin || pin.length !== 6) {
+      if (!cleanPin || cleanPin.length !== 6 || !/^\d{6}$/.test(cleanPin)) {
         return {
           success: false,
           error: "PIN must be exactly 6 numeric digits.",
         }
       }
 
+      // Helper for phone matching
+      const matchPhone = (userPhone: string) => {
+        const uDigits = userPhone.replace(/\D/g, "")
+        if (digits.length >= 10 && uDigits.length >= 10) {
+          return uDigits.endsWith(digits.slice(-10)) || digits.endsWith(uDigits.slice(-10))
+        }
+        return digits.length > 0 && uDigits === digits
+      }
+
       // 1. Check Officers
       const matchedOfficer = officers.find((o) => {
-        const offDigits = o.phone.replace(/\D/g, "")
         return (
-          (digits.length >= 10 && offDigits === digits) ||
+          matchPhone(o.phone) ||
           o.code.toLowerCase() === raw ||
           o.email.toLowerCase() === raw ||
           (digits === "01711000111" && o.id === "off-1")
@@ -229,6 +303,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       })
 
       if (matchedOfficer) {
+        const validPin = matchedOfficer.pin || "123456"
+        if (cleanPin !== validPin) {
+          return {
+            success: false,
+            error: "Incorrect 6-digit PIN. Please enter your valid PIN.",
+          }
+        }
+
         setCurrentRole("officer")
         setCurrentOfficerId(matchedOfficer.id)
         if (typeof window !== "undefined") {
@@ -244,9 +326,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
       // 2. Check Area Managers (AM)
       const matchedAM = ams.find((a) => {
-        const amDigits = a.phone.replace(/\D/g, "")
         return (
-          (digits.length >= 10 && amDigits === digits) ||
+          matchPhone(a.phone) ||
           a.code.toLowerCase() === raw ||
           a.email.toLowerCase() === raw ||
           (digits === "01722100200" && a.id === "am-1")
@@ -254,6 +335,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       })
 
       if (matchedAM) {
+        const validPin = matchedAM.pin || "123456"
+        if (cleanPin !== validPin) {
+          return {
+            success: false,
+            error: "Incorrect 6-digit PIN. Please enter your valid PIN.",
+          }
+        }
+
         setCurrentRole("am")
         setCurrentAMId(matchedAM.id)
         if (typeof window !== "undefined") {
@@ -269,9 +358,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
       // 3. Check Regional Managers (RM)
       const matchedRM = rms.find((r) => {
-        const rmDigits = r.phone.replace(/\D/g, "")
         return (
-          (digits.length >= 10 && rmDigits === digits) ||
+          matchPhone(r.phone) ||
           r.code.toLowerCase() === raw ||
           r.email.toLowerCase() === raw ||
           (digits === "01712111222" && r.id === "rm-1")
@@ -279,6 +367,14 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       })
 
       if (matchedRM) {
+        const validPin = matchedRM.pin || "123456"
+        if (cleanPin !== validPin) {
+          return {
+            success: false,
+            error: "Incorrect 6-digit PIN. Please enter your valid PIN.",
+          }
+        }
+
         setCurrentRole("rm")
         setCurrentRMId(matchedRM.id)
         if (typeof window !== "undefined") {
@@ -364,6 +460,137 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     if (rm) {
       setCurrentRMId(rm.id)
     }
+  }, [])
+
+  // Verify and change PIN for currently logged in staff
+  const verifyAndChangePin = React.useCallback(
+    (
+      role: StaffRole,
+      id: string,
+      currentPin: string,
+      newPin: string
+    ): { success: boolean; message: string } => {
+      const cleanCurrent = currentPin.trim()
+      const cleanNew = newPin.trim()
+
+      if (!cleanNew || cleanNew.length !== 6 || !/^\d{6}$/.test(cleanNew)) {
+        return {
+          success: false,
+          message: "New PIN must be exactly 6 numeric digits.",
+        }
+      }
+
+      if (role === "officer") {
+        const off = officers.find((o) => o.id === id)
+        if (!off) return { success: false, message: "Officer account not found." }
+        const expectedPin = off.pin || "123456"
+        if (cleanCurrent !== expectedPin) {
+          return { success: false, message: "Current PIN is incorrect. Please enter your existing 6-digit PIN." }
+        }
+        setOfficers((prev) =>
+          prev.map((o) => (o.id === id ? { ...o, pin: cleanNew } : o))
+        )
+        return { success: true, message: "PIN changed successfully! Use this new PIN for future logins." }
+      }
+
+      if (role === "am") {
+        const am = ams.find((a) => a.id === id)
+        if (!am) return { success: false, message: "AM account not found." }
+        const expectedPin = am.pin || "123456"
+        if (cleanCurrent !== expectedPin) {
+          return { success: false, message: "Current PIN is incorrect. Please enter your existing 6-digit PIN." }
+        }
+        setAms((prev) =>
+          prev.map((a) => (a.id === id ? { ...a, pin: cleanNew } : a))
+        )
+        return { success: true, message: "PIN changed successfully! Use this new PIN for future logins." }
+      }
+
+      if (role === "rm") {
+        const rm = rms.find((r) => r.id === id)
+        if (!rm) return { success: false, message: "RM account not found." }
+        const expectedPin = rm.pin || "123456"
+        if (cleanCurrent !== expectedPin) {
+          return { success: false, message: "Current PIN is incorrect. Please enter your existing 6-digit PIN." }
+        }
+        setRms((prev) =>
+          prev.map((r) => (r.id === id ? { ...r, pin: cleanNew } : r))
+        )
+        return { success: true, message: "PIN changed successfully! Use this new PIN for future logins." }
+      }
+
+      return { success: false, message: "Invalid role specified." }
+    },
+    [officers, ams, rms]
+  )
+
+  // Staff CRUD Mutations
+  const addOfficer = React.useCallback(
+    (offData: Omit<SalesOfficerItem, "id">): SalesOfficerItem => {
+      const newOff: SalesOfficerItem = {
+        ...offData,
+        id: `off-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        pin: offData.pin || "123456",
+        totalOrders: 0,
+        totalSales: 0,
+      }
+      setOfficers((prev) => [newOff, ...prev])
+      return newOff
+    },
+    []
+  )
+
+  const updateOfficer = React.useCallback(
+    (id: string, updates: Partial<SalesOfficerItem>) => {
+      setOfficers((prev) => prev.map((o) => (o.id === id ? { ...o, ...updates } : o)))
+    },
+    []
+  )
+
+  const deleteOfficer = React.useCallback((id: string) => {
+    setOfficers((prev) => prev.filter((o) => o.id !== id))
+  }, [])
+
+  const addAM = React.useCallback(
+    (amData: Omit<AMItem, "id">): AMItem => {
+      const newAM: AMItem = {
+        ...amData,
+        id: `am-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        pin: amData.pin || "123456",
+      }
+      setAms((prev) => [newAM, ...prev])
+      return newAM
+    },
+    []
+  )
+
+  const updateAM = React.useCallback((id: string, updates: Partial<AMItem>) => {
+    setAms((prev) => prev.map((a) => (a.id === id ? { ...a, ...updates } : a)))
+  }, [])
+
+  const deleteAM = React.useCallback((id: string) => {
+    setAms((prev) => prev.filter((a) => a.id !== id))
+  }, [])
+
+  const addRM = React.useCallback(
+    (rmData: Omit<RMItem, "id">): RMItem => {
+      const newRM: RMItem = {
+        ...rmData,
+        id: `rm-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        pin: rmData.pin || "123456",
+      }
+      setRms((prev) => [newRM, ...prev])
+      return newRM
+    },
+    []
+  )
+
+  const updateRM = React.useCallback((id: string, updates: Partial<RMItem>) => {
+    setRms((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)))
+  }, [])
+
+  const deleteRM = React.useCallback((id: string) => {
+    setRms((prev) => prev.filter((r) => r.id !== id))
   }, [])
 
   // Helper: Find officer assigned depot through area hierarchy
@@ -493,6 +720,16 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         loginOfficer,
         logoutOfficer,
         logoutStaff,
+        verifyAndChangePin,
+        addOfficer,
+        updateOfficer,
+        deleteOfficer,
+        addAM,
+        updateAM,
+        deleteAM,
+        addRM,
+        updateRM,
+        deleteRM,
         createOrder,
         approveOrder,
         cancelOrder,

@@ -19,6 +19,8 @@ import {
   Mail,
   Phone,
   Eye,
+  EyeOff,
+  KeyRound,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -27,10 +29,6 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAppState } from "@/lib/store"
 import {
-  initialOfficers,
-  initialAMs,
-  initialRMs,
-  initialAreasWithDepot,
   type SalesOfficerItem,
   type AMItem,
   type RMItem,
@@ -38,11 +36,18 @@ import {
 } from "@/lib/mock-data"
 
 export default function SalesOfficersPage() {
-  const { currentRole, currentRM, currentAM } = useAppState()
-  const [officers, setOfficers] = React.useState<SalesOfficerItem[]>(initialOfficers)
-  const [ams] = React.useState<AMItem[]>(initialAMs)
-  const [rms] = React.useState<RMItem[]>(initialRMs)
-  const [areas] = React.useState<AreaItem[]>(initialAreasWithDepot)
+  const {
+    currentRole,
+    currentRM,
+    currentAM,
+    officers,
+    ams,
+    rms,
+    areas,
+    addOfficer,
+    updateOfficer,
+    deleteOfficer,
+  } = useAppState()
 
   // Filter States: Area Wise, RM Wise, AM Wise + Search
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -54,12 +59,14 @@ export default function SalesOfficersPage() {
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
   const [editingOfficer, setEditingOfficer] = React.useState<SalesOfficerItem | null>(null)
   const [deletingOfficer, setDeletingOfficer] = React.useState<SalesOfficerItem | null>(null)
+  const [showPinModal, setShowPinModal] = React.useState(false)
 
   // Form input state
   const [formData, setFormData] = React.useState({
     code: "",
     name: "",
     phone: "",
+    pin: "123456",
     email: "",
     areaId: areas[0]?.id || "1",
     rmId: rms[0]?.id || "rm-1",
@@ -194,6 +201,7 @@ export default function SalesOfficersPage() {
     code?: string
     name?: string
     phone?: string
+    pin?: string
     email?: string
     areaId?: string
     rmId?: string
@@ -213,11 +221,13 @@ export default function SalesOfficersPage() {
       code: `OFF-${String(nextCodeNumber).padStart(3, "0")}`,
       name: "",
       phone: "",
+      pin: "123456",
       email: "",
       areaId: defaultArea,
       rmId: defaultRM,
       amId: defaultAM,
     })
+    setShowPinModal(false)
     setFormError("")
     setFormErrors({})
     setIsCreateOpen(true)
@@ -230,11 +240,13 @@ export default function SalesOfficersPage() {
       code: off.code,
       name: off.name,
       phone: off.phone,
+      pin: off.pin || "123456",
       email: off.email || "",
       areaId: off.areaId,
       rmId: off.rmId,
       amId: off.amId,
     })
+    setShowPinModal(false)
     setFormError("")
     setFormErrors({})
   }
@@ -246,6 +258,7 @@ export default function SalesOfficersPage() {
       code?: string
       name?: string
       phone?: string
+      pin?: string
       email?: string
       areaId?: string
       rmId?: string
@@ -260,6 +273,9 @@ export default function SalesOfficersPage() {
     }
     if (!formData.phone.trim()) {
       errors.phone = "This field is required."
+    }
+    if (!formData.pin || formData.pin.length !== 6 || !/^\d{6}$/.test(formData.pin)) {
+      errors.pin = "PIN must be exactly 6 numeric digits."
     }
     if (!formData.areaId) {
       errors.areaId = "This field is required."
@@ -292,33 +308,11 @@ export default function SalesOfficersPage() {
     const amName = assignedAM ? assignedAM.name : "Unassigned"
 
     if (editingOfficer) {
-      setOfficers((prev) =>
-        prev.map((item) =>
-          item.id === editingOfficer.id
-            ? {
-                ...item,
-                code: formData.code.trim().toUpperCase(),
-                name: formData.name.trim(),
-                phone: formData.phone.trim(),
-                email: formData.email.trim(),
-                areaId: formData.areaId,
-                areaName,
-                rmId: formData.rmId,
-                rmName,
-                amId: formData.amId,
-                amName,
-              }
-            : item
-        )
-      )
-      setEditingOfficer(null)
-      showToast("Sales Officer updated successfully.")
-    } else {
-      const newOfficer: SalesOfficerItem = {
-        id: `off-${Date.now()}`,
-        code: formData.code.trim().toUpperCase() || `OFF-${String(officers.length + 1).padStart(3, "0")}`,
+      updateOfficer(editingOfficer.id, {
+        code: formData.code.trim().toUpperCase(),
         name: formData.name.trim(),
         phone: formData.phone.trim(),
+        pin: formData.pin.trim(),
         email: formData.email.trim(),
         areaId: formData.areaId,
         areaName,
@@ -326,12 +320,25 @@ export default function SalesOfficersPage() {
         rmName,
         amId: formData.amId,
         amName,
-        totalOrders: 0,
-        totalSales: 0,
-      }
-      setOfficers((prev) => [newOfficer, ...prev])
+      })
+      setEditingOfficer(null)
+      showToast("Sales Officer updated successfully.")
+    } else {
+      addOfficer({
+        code: formData.code.trim().toUpperCase() || `OFF-${String(officers.length + 1).padStart(3, "0")}`,
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        pin: formData.pin.trim() || "123456",
+        email: formData.email.trim(),
+        areaId: formData.areaId,
+        areaName,
+        rmId: formData.rmId,
+        rmName,
+        amId: formData.amId,
+        amName,
+      })
       setIsCreateOpen(false)
-      showToast("New Sales Officer added successfully.")
+      showToast("New Sales Officer added successfully with 6-digit login PIN.")
     }
     setFormErrors({})
     setFormError("")
@@ -340,7 +347,7 @@ export default function SalesOfficersPage() {
   // Handle Delete
   const handleConfirmDelete = () => {
     if (!deletingOfficer) return
-    setOfficers((prev) => prev.filter((item) => item.id !== deletingOfficer.id))
+    deleteOfficer(deletingOfficer.id)
     setDeletingOfficer(null)
     showToast("Sales Officer deleted successfully.")
   }
@@ -740,11 +747,55 @@ export default function SalesOfficersPage() {
                     setFormData((prev) => ({ ...prev, phone: e.target.value }))
                     if (formErrors.phone) setFormErrors((prev) => ({ ...prev, phone: undefined }))
                   }}
-                  placeholder="e.g. +880 1755-112233"
+                  placeholder="e.g. 01711-000111"
                   className={`text-xs font-mono ${formErrors.phone ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 />
                 {formErrors.phone && (
                   <p className="text-[11px] text-destructive">{formErrors.phone}</p>
+                )}
+              </div>
+
+              {/* Login PIN (6-Digit) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="officerPin" className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <KeyRound className="size-3.5 text-primary" />
+                    <span>6-Digit Login PIN</span>
+                  </Label>
+                  <span className="text-[10px] text-muted-foreground">Default: 123456</span>
+                </div>
+                <div className="relative">
+                  <Input
+                    id="officerPin"
+                    name="officerPin"
+                    type={showPinModal ? "text" : "password"}
+                    maxLength={6}
+                    value={formData.pin}
+                    onChange={(e) => {
+                      const numeric = e.target.value.replace(/\D/g, "").slice(0, 6)
+                      setFormData((prev) => ({ ...prev, pin: numeric }))
+                      if (formErrors.pin) setFormErrors((prev) => ({ ...prev, pin: undefined }))
+                    }}
+                    placeholder="e.g. 123456"
+                    className={`text-xs font-mono tracking-wider pr-9 ${formErrors.pin ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => setShowPinModal(!showPinModal)}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                    aria-label={showPinModal ? "Hide PIN" : "Show PIN"}
+                  >
+                    {showPinModal ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  </Button>
+                </div>
+                {formErrors.pin ? (
+                  <p className="text-[11px] text-destructive">{formErrors.pin}</p>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground">
+                    Officer will use this 6-digit PIN and Phone Number to log into the field portal.
+                  </p>
                 )}
               </div>
 

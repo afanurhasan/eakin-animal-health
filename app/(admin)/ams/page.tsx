@@ -18,6 +18,8 @@ import {
   Mail,
   Phone,
   Eye,
+  EyeOff,
+  KeyRound,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -26,19 +28,22 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAppState } from "@/lib/store"
 import {
-  initialAMs,
-  initialRMs,
-  initialAreasWithDepot,
   type AMItem,
   type RMItem,
   type AreaItem,
 } from "@/lib/mock-data"
 
 export default function AreaManagersPage() {
-  const { currentRole, currentRM } = useAppState()
-  const [ams, setAms] = React.useState<AMItem[]>(initialAMs)
-  const [rms] = React.useState<RMItem[]>(initialRMs)
-  const [areas] = React.useState<AreaItem[]>(initialAreasWithDepot)
+  const {
+    currentRole,
+    currentRM,
+    ams,
+    rms,
+    areas,
+    addAM,
+    updateAM,
+    deleteAM,
+  } = useAppState()
 
   // Filter States
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -49,12 +54,14 @@ export default function AreaManagersPage() {
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
   const [editingAM, setEditingAM] = React.useState<AMItem | null>(null)
   const [deletingAM, setDeletingAM] = React.useState<AMItem | null>(null)
+  const [showPinModal, setShowPinModal] = React.useState(false)
 
   // Form input state
   const [formData, setFormData] = React.useState({
     code: "",
     name: "",
     phone: "",
+    pin: "123456",
     email: "",
     areaId: areas[0]?.id || "1",
     rmId: rms[0]?.id || "rm-1",
@@ -125,6 +132,7 @@ export default function AreaManagersPage() {
     code?: string
     name?: string
     phone?: string
+    pin?: string
     email?: string
     areaId?: string
     rmId?: string
@@ -141,10 +149,12 @@ export default function AreaManagersPage() {
       code: `AM-${String(nextCodeNumber).padStart(3, "0")}`,
       name: "",
       phone: "",
+      pin: "123456",
       email: "",
       areaId: defaultArea,
       rmId: defaultRM,
     })
+    setShowPinModal(false)
     setFormError("")
     setFormErrors({})
     setIsCreateOpen(true)
@@ -157,10 +167,12 @@ export default function AreaManagersPage() {
       code: am.code,
       name: am.name,
       phone: am.phone,
+      pin: am.pin || "123456",
       email: am.email || "",
       areaId: am.areaId,
       rmId: am.rmId,
     })
+    setShowPinModal(false)
     setFormError("")
     setFormErrors({})
   }
@@ -183,6 +195,7 @@ export default function AreaManagersPage() {
       code?: string
       name?: string
       phone?: string
+      pin?: string
       email?: string
       areaId?: string
       rmId?: string
@@ -196,6 +209,9 @@ export default function AreaManagersPage() {
     }
     if (!formData.phone.trim()) {
       errors.phone = "This field is required."
+    }
+    if (!formData.pin || formData.pin.length !== 6 || !/^\d{6}$/.test(formData.pin)) {
+      errors.pin = "PIN must be exactly 6 numeric digits."
     }
     if (!formData.areaId) {
       errors.areaId = "This field is required."
@@ -223,40 +239,33 @@ export default function AreaManagersPage() {
     const rmName = assignedRM ? assignedRM.name : "Unassigned"
 
     if (editingAM) {
-      setAms((prev) =>
-        prev.map((item) =>
-          item.id === editingAM.id
-            ? {
-                ...item,
-                code: formData.code.trim().toUpperCase(),
-                name: formData.name.trim(),
-                phone: formData.phone.trim(),
-                email: formData.email.trim(),
-                areaId: formData.areaId,
-                areaName,
-                rmId: formData.rmId,
-                rmName,
-              }
-            : item
-        )
-      )
-      setEditingAM(null)
-      showToast("Area Manager updated successfully.")
-    } else {
-      const newAM: AMItem = {
-        id: `am-${Date.now()}`,
-        code: formData.code.trim().toUpperCase() || `AM-${String(ams.length + 1).padStart(3, "0")}`,
+      updateAM(editingAM.id, {
+        code: formData.code.trim().toUpperCase(),
         name: formData.name.trim(),
         phone: formData.phone.trim(),
+        pin: formData.pin.trim(),
         email: formData.email.trim(),
         areaId: formData.areaId,
         areaName,
         rmId: formData.rmId,
         rmName,
-      }
-      setAms((prev) => [newAM, ...prev])
+      })
+      setEditingAM(null)
+      showToast("Area Manager updated successfully.")
+    } else {
+      addAM({
+        code: formData.code.trim().toUpperCase() || `AM-${String(ams.length + 1).padStart(3, "0")}`,
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        pin: formData.pin.trim() || "123456",
+        email: formData.email.trim(),
+        areaId: formData.areaId,
+        areaName,
+        rmId: formData.rmId,
+        rmName,
+      })
       setIsCreateOpen(false)
-      showToast("New Area Manager added successfully.")
+      showToast("New Area Manager added successfully with 6-digit login PIN.")
     }
     setFormErrors({})
     setFormError("")
@@ -265,7 +274,7 @@ export default function AreaManagersPage() {
   // Handle Delete
   const handleConfirmDelete = () => {
     if (!deletingAM) return
-    setAms((prev) => prev.filter((item) => item.id !== deletingAM.id))
+    deleteAM(deletingAM.id)
     setDeletingAM(null)
     showToast("Area Manager deleted successfully.")
   }
@@ -630,11 +639,55 @@ export default function AreaManagersPage() {
                     setFormData((prev) => ({ ...prev, phone: e.target.value }))
                     if (formErrors.phone) setFormErrors((prev) => ({ ...prev, phone: undefined }))
                   }}
-                  placeholder="e.g. +880 1722-100200"
+                  placeholder="e.g. 01722-100200"
                   className={`text-xs font-mono ${formErrors.phone ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 />
                 {formErrors.phone && (
                   <p className="text-[11px] text-destructive">{formErrors.phone}</p>
+                )}
+              </div>
+
+              {/* Login PIN (6-Digit) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="amPin" className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <KeyRound className="size-3.5 text-primary" />
+                    <span>6-Digit Login PIN</span>
+                  </Label>
+                  <span className="text-[10px] text-muted-foreground">Default: 123456</span>
+                </div>
+                <div className="relative">
+                  <Input
+                    id="amPin"
+                    name="amPin"
+                    type={showPinModal ? "text" : "password"}
+                    maxLength={6}
+                    value={formData.pin}
+                    onChange={(e) => {
+                      const numeric = e.target.value.replace(/\D/g, "").slice(0, 6)
+                      setFormData((prev) => ({ ...prev, pin: numeric }))
+                      if (formErrors.pin) setFormErrors((prev) => ({ ...prev, pin: undefined }))
+                    }}
+                    placeholder="e.g. 123456"
+                    className={`text-xs font-mono tracking-wider pr-9 ${formErrors.pin ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => setShowPinModal(!showPinModal)}
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                    aria-label={showPinModal ? "Hide PIN" : "Show PIN"}
+                  >
+                    {showPinModal ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  </Button>
+                </div>
+                {formErrors.pin ? (
+                  <p className="text-[11px] text-destructive">{formErrors.pin}</p>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground">
+                    Area Manager will use this 6-digit PIN and Phone Number to log into the field portal.
+                  </p>
                 )}
               </div>
 

@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useTheme } from "next-themes"
 import {
@@ -11,6 +12,7 @@ import {
   UsersRound,
   Shield,
   MapPin,
+  User,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -47,6 +49,7 @@ export function OfficerHeader({ onOpenSidebar }: OfficerHeaderProps) {
     if (pathname === "/officer/rm/dashboard") return "Regional Manager Dashboard"
     if (pathname === "/officer/am/dashboard") return "Area Manager Dashboard"
     if (pathname === "/officer/dashboard") return "Sales Officer Dashboard"
+    if (pathname === "/officer/profile") return "My Profile & PIN Settings"
 
     const currentItem = activeNavConfig.find(
       (item) =>
@@ -134,10 +137,14 @@ export function OfficerHeader({ onOpenSidebar }: OfficerHeaderProps) {
       {/* Right side: Role/User Badge & Theme Toggle */}
       <div className="flex items-center gap-2.5">
         {currentUser && (
-          <div className="hidden sm:flex items-center gap-2 rounded-md border border-border/80 bg-muted/30 px-2.5 py-1 text-xs">
-            <UserIcon className="size-3.5 text-primary" />
+          <Link
+            href="/officer/profile"
+            className="hidden sm:flex items-center gap-2 rounded-md border border-border/80 bg-muted/30 px-2.5 py-1 text-xs transition-all hover:border-primary/40 hover:bg-muted/70 hover:shadow-2xs group"
+            title="Click to view profile & change 6-digit PIN"
+          >
+            <UserIcon className="size-3.5 text-primary transition-transform group-hover:scale-110" />
             <div className="flex items-center gap-1.5 font-medium text-foreground">
-              <span>{currentUser.name}</span>
+              <span className="group-hover:text-primary transition-colors">{currentUser.name}</span>
               <span className="font-mono text-[10px] text-muted-foreground">({currentUser.code})</span>
             </div>
             <span className="rounded bg-primary/10 px-1.5 py-0.2 font-mono text-[10px] font-semibold text-primary">
@@ -148,7 +155,7 @@ export function OfficerHeader({ onOpenSidebar }: OfficerHeaderProps) {
               <MapPin className="size-3 text-muted-foreground" />
               <span>{currentUser.territory}</span>
             </div>
-          </div>
+          </Link>
         )}
 
         {mounted && (

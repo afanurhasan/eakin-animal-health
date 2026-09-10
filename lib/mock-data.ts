@@ -203,6 +203,7 @@ export interface RMItem {
   name: string
   phone: string
   email: string
+  pin?: string
   areaId: string
   areaName: string
 }
@@ -213,6 +214,7 @@ export interface AMItem {
   name: string
   phone: string
   email: string
+  pin?: string
   areaId: string
   areaName: string
   rmId: string
@@ -225,6 +227,7 @@ export interface SalesOfficerItem {
   name: string
   phone: string
   email: string
+  pin?: string
   areaId: string
   areaName: string
   rmId: string
@@ -754,6 +757,7 @@ export const initialRMs: RMItem[] = [
     name: "Md. Rahim",
     phone: "01712-111222",
     email: "rahim@eakinhealth.com",
+    pin: "123456",
     areaId: "1",
     areaName: "Dhaka North",
   },
@@ -763,6 +767,7 @@ export const initialRMs: RMItem[] = [
     name: "Mustafizur Rahman",
     phone: "01819-333444",
     email: "mustafiz@eakinhealth.com",
+    pin: "123456",
     areaId: "4",
     areaName: "Bogura Town",
   },
@@ -772,6 +777,7 @@ export const initialRMs: RMItem[] = [
     name: "Anwar Parvez",
     phone: "01911-555666",
     email: "anwar@eakinhealth.com",
+    pin: "123456",
     areaId: "3",
     areaName: "Chittagong Central",
   },
@@ -781,6 +787,7 @@ export const initialRMs: RMItem[] = [
     name: "Kamrul Ahsan",
     phone: "01713-777888",
     email: "kamrul@eakinhealth.com",
+    pin: "123456",
     areaId: "5",
     areaName: "Rajshahi Sadar",
   },
@@ -790,6 +797,7 @@ export const initialRMs: RMItem[] = [
     name: "Shahidul Islam",
     phone: "01612-999000",
     email: "shahidul@eakinhealth.com",
+    pin: "123456",
     areaId: "2",
     areaName: "Dhaka South",
   },
@@ -803,6 +811,7 @@ export const initialAMs: AMItem[] = [
     name: "Md. Karim",
     phone: "01722-100200",
     email: "karim@eakinhealth.com",
+    pin: "123456",
     areaId: "1",
     areaName: "Dhaka North",
     rmId: "rm-1",
@@ -814,6 +823,7 @@ export const initialAMs: AMItem[] = [
     name: "Sajid Hasan",
     phone: "01733-200300",
     email: "sajid@eakinhealth.com",
+    pin: "123456",
     areaId: "1",
     areaName: "Dhaka North",
     rmId: "rm-1",
@@ -825,6 +835,7 @@ export const initialAMs: AMItem[] = [
     name: "Faruk Hossain",
     phone: "01822-300400",
     email: "faruk@eakinhealth.com",
+    pin: "123456",
     areaId: "4",
     areaName: "Bogura Town",
     rmId: "rm-2",
@@ -836,6 +847,7 @@ export const initialAMs: AMItem[] = [
     name: "Tariqul Islam",
     phone: "01922-400500",
     email: "tariqul@eakinhealth.com",
+    pin: "123456",
     areaId: "3",
     areaName: "Chittagong Central",
     rmId: "rm-3",
@@ -847,6 +859,7 @@ export const initialAMs: AMItem[] = [
     name: "Nazmul Huda",
     phone: "01744-500600",
     email: "nazmul@eakinhealth.com",
+    pin: "123456",
     areaId: "5",
     areaName: "Rajshahi Sadar",
     rmId: "rm-4",
@@ -862,6 +875,7 @@ export const initialOfficers: SalesOfficerItem[] = [
     name: "Arafat Hossain",
     phone: "01711-000111",
     email: "arafat@eakinhealth.com",
+    pin: "123456",
     areaId: "1",
     areaName: "Dhaka North",
     rmId: "rm-1",
@@ -877,6 +891,7 @@ export const initialOfficers: SalesOfficerItem[] = [
     name: "Tanvir Ahmed",
     phone: "01766-223344",
     email: "tanvir@eakinhealth.com",
+    pin: "123456",
     areaId: "1",
     areaName: "Dhaka North",
     rmId: "rm-1",
@@ -892,6 +907,7 @@ export const initialOfficers: SalesOfficerItem[] = [
     name: "Mahmudul Hasan",
     phone: "01777-334455",
     email: "mahmudul@eakinhealth.com",
+    pin: "123456",
     areaId: "1",
     areaName: "Dhaka North",
     rmId: "rm-1",
@@ -907,6 +923,7 @@ export const initialOfficers: SalesOfficerItem[] = [
     name: "Zakir Hossain",
     phone: "01833-445566",
     email: "zakir@eakinhealth.com",
+    pin: "123456",
     areaId: "4",
     areaName: "Bogura Town",
     rmId: "rm-2",
@@ -922,6 +939,7 @@ export const initialOfficers: SalesOfficerItem[] = [
     name: "Shafiqul Alam",
     phone: "01933-556677",
     email: "shafiqul@eakinhealth.com",
+    pin: "123456",
     areaId: "3",
     areaName: "Chittagong Central",
     rmId: "rm-3",
@@ -937,6 +955,7 @@ export const initialOfficers: SalesOfficerItem[] = [
     name: "Biplob Kumar",
     phone: "01788-667788",
     email: "biplob@eakinhealth.com",
+    pin: "123456",
     areaId: "5",
     areaName: "Rajshahi Sadar",
     rmId: "rm-4",

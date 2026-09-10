@@ -13,6 +13,7 @@ import {
   X,
   UserCheck,
   UsersRound,
+  User,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -46,6 +47,11 @@ export const officerNavItemsConfig: OfficerNavItemConfig[] = [
     title: "Stock",
     href: "/officer/stock",
     icon: Boxes,
+  },
+  {
+    title: "My Profile & PIN",
+    href: "/officer/profile",
+    icon: User,
   },
 ]
 
@@ -81,6 +87,11 @@ export const rmNavItemsConfig: OfficerNavItemConfig[] = [
     href: "/stock-management",
     icon: Boxes,
   },
+  {
+    title: "My Profile & PIN",
+    href: "/officer/profile",
+    icon: User,
+  },
 ]
 
 // 3. Area Manager (AM) Navigation
@@ -109,6 +120,11 @@ export const amNavItemsConfig: OfficerNavItemConfig[] = [
     title: "Stock",
     href: "/stock-management",
     icon: Boxes,
+  },
+  {
+    title: "My Profile & PIN",
+    href: "/officer/profile",
+    icon: User,
   },
 ]
 
