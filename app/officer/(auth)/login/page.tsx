@@ -266,7 +266,7 @@ export default function OfficerLoginPage() {
                 <div className="grid grid-cols-3 gap-1">
                   <button
                     type="button"
-                    onClick={() => fillCredentials("01711000111", "Sales Officer")}
+                    onClick={() => fillCredentials("01711000111", "MPO")}
                     className={cn(
                       "cursor-pointer rounded border px-1.5 py-1 text-center font-medium transition-colors",
                       phone.replace(/\D/g, "") === "01711000111"
@@ -274,7 +274,7 @@ export default function OfficerLoginPage() {
                         : "border-border bg-background/80 text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    Officer
+                    MPO
                   </button>
                   <button
                     type="button"

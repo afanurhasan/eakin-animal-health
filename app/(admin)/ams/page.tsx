@@ -10,6 +10,7 @@ import {
   MapPin,
   UsersRound,
   UserRound,
+  Building,
   Filter,
   X,
   AlertTriangle,
@@ -84,11 +85,14 @@ export default function AreaManagersPage() {
     return ams
   }, [ams, currentRole, currentRM])
 
-  // Dependent RMs for the selected Area in the Filter bar
+  // Dependent RMs for the selected Area in the Filter bar (via Regional Office)
   const availableRMsForFilter = React.useMemo(() => {
     if (selectedAreaFilter === "all") return rms
-    return rms.filter((r) => r.areaId === selectedAreaFilter)
-  }, [rms, selectedAreaFilter])
+    const area = areas.find((a) => a.id === selectedAreaFilter)
+    if (!area) return rms
+    const matched = rms.filter((r) => r.regionalOfficeId === area.regionalOfficeId)
+    return matched.length > 0 ? matched : rms
+  }, [rms, areas, selectedAreaFilter])
 
   // Reset or adjust RM filter if area filter changes
   React.useEffect(() => {
@@ -122,11 +126,16 @@ export default function AreaManagersPage() {
     })
   }, [roleBaseAMs, searchQuery, currentRole, selectedAreaFilter, selectedRMFilter])
 
-  // Available RMs for the form based on selected formData.areaId
-  const availableRMsForForm = React.useMemo(() => {
-    const matched = rms.filter((r) => r.areaId === formData.areaId)
-    return matched.length > 0 ? matched : rms
-  }, [rms, formData.areaId])
+  // Target Area for the form
+  const targetFormArea = React.useMemo(() => {
+    return areas.find((a) => a.id === formData.areaId) || areas[0]
+  }, [areas, formData.areaId])
+
+  // Automatically matched RM for the form based on targetFormArea's Regional Office
+  const autoAssignedRM = React.useMemo(() => {
+    if (!targetFormArea) return rms[0] || null
+    return rms.find((r) => r.regionalOfficeId === targetFormArea.regionalOfficeId) || rms[0] || null
+  }, [rms, targetFormArea])
 
   const [formErrors, setFormErrors] = React.useState<{
     code?: string
@@ -135,15 +144,14 @@ export default function AreaManagersPage() {
     pin?: string
     email?: string
     areaId?: string
-    rmId?: string
   }>({})
 
   // Open Create Modal
   const handleOpenCreate = () => {
     const nextCodeNumber = ams.length + 1
-    const defaultArea = areas[0]?.id || "1"
-    const matchedRMs = rms.filter((r) => r.areaId === defaultArea)
-    const defaultRM = matchedRMs[0]?.id || rms[0]?.id || "rm-1"
+    const defaultArea = areas[0]?.id || "area-1"
+    const targetArea = areas.find((a) => a.id === defaultArea)
+    const matchedRM = rms.find((r) => r.regionalOfficeId === targetArea?.regionalOfficeId) || rms[0]
 
     setFormData({
       code: `AM-${String(nextCodeNumber).padStart(3, "0")}`,
@@ -152,7 +160,7 @@ export default function AreaManagersPage() {
       pin: "123456",
       email: "",
       areaId: defaultArea,
-      rmId: defaultRM,
+      rmId: matchedRM?.id || "rm-1",
     })
     setShowPinModal(false)
     setFormError("")
@@ -163,6 +171,9 @@ export default function AreaManagersPage() {
   // Open Edit Modal
   const handleOpenEdit = (am: AMItem) => {
     setEditingAM(am)
+    const targetArea = areas.find((a) => a.id === am.areaId)
+    const matchedRM = rms.find((r) => r.regionalOfficeId === targetArea?.regionalOfficeId) || rms.find((r) => r.id === am.rmId) || rms[0]
+
     setFormData({
       code: am.code,
       name: am.name,
@@ -170,21 +181,21 @@ export default function AreaManagersPage() {
       pin: am.pin || "123456",
       email: am.email || "",
       areaId: am.areaId,
-      rmId: am.rmId,
+      rmId: matchedRM?.id || am.rmId,
     })
     setShowPinModal(false)
     setFormError("")
     setFormErrors({})
   }
 
-  // Handle Area Change in Form (updates RM selection automatically)
+  // Handle Area Change in Form (updates RM automatically according to Regional Office)
   const handleFormAreaChange = (newAreaId: string) => {
-    const matchingRMs = rms.filter((r) => r.areaId === newAreaId)
-    const newRMId = matchingRMs[0]?.id || rms[0]?.id || "rm-1"
+    const targetArea = areas.find((a) => a.id === newAreaId)
+    const matchedRM = rms.find((r) => r.regionalOfficeId === targetArea?.regionalOfficeId) || rms[0]
     setFormData((prev) => ({
       ...prev,
       areaId: newAreaId,
-      rmId: newRMId,
+      rmId: matchedRM?.id || "rm-1",
     }))
   }
 
@@ -198,7 +209,6 @@ export default function AreaManagersPage() {
       pin?: string
       email?: string
       areaId?: string
-      rmId?: string
     } = {}
 
     if (!formData.code.trim()) {
@@ -216,9 +226,6 @@ export default function AreaManagersPage() {
     if (!formData.areaId) {
       errors.areaId = "This field is required."
     }
-    if (!formData.rmId) {
-      errors.rmId = "This field is required."
-    }
 
     if (
       formData.email.trim() &&
@@ -233,9 +240,10 @@ export default function AreaManagersPage() {
     }
 
     const assignedArea = areas.find((a) => a.id === formData.areaId)
-    const assignedRM = rms.find((r) => r.id === formData.rmId)
+    const assignedRM = rms.find((r) => r.regionalOfficeId === assignedArea?.regionalOfficeId) || rms.find((r) => r.id === formData.rmId) || rms[0]
 
     const areaName = assignedArea ? assignedArea.name : "Unassigned"
+    const rmId = assignedRM ? assignedRM.id : ""
     const rmName = assignedRM ? assignedRM.name : "Unassigned"
 
     if (editingAM) {
@@ -324,25 +332,6 @@ export default function AreaManagersPage() {
 
             {/* Filter and Search Controls */}
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-              {/* 1. Area Filter (Admin Only) */}
-              {currentRole === "admin" && (
-                <div className="flex items-center gap-1.5">
-                  <Filter className="size-3.5 text-muted-foreground" />
-                  <select
-                    aria-label="Filter by Area"
-                    value={selectedAreaFilter}
-                    onChange={(e) => setSelectedAreaFilter(e.target.value)}
-                    className="h-8 rounded border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring cursor-pointer"
-                  >
-                    <option value="all">All Areas</option>
-                    {areas.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               {/* 2. RM Filter (Admin Only) */}
               {currentRole === "admin" && (
@@ -738,29 +727,33 @@ export default function AreaManagersPage() {
                 )}
               </div>
 
-              {/* Assigned RM (dependent on Area) */}
+              {/* Auto-connected Regional Manager (RM) */}
               <div className="space-y-1.5">
-                <Label htmlFor="amRM" className="text-xs font-medium text-foreground">
-                  Assigned Regional Manager (RM)
+                <Label className="text-xs font-medium text-foreground">
+                  Connected Regional Manager (RM)
                 </Label>
-                <select
-                  id="amRM"
-                  value={formData.rmId}
-                  onChange={(e) => {
-                    setFormData((prev) => ({ ...prev, rmId: e.target.value }))
-                    if (formErrors.rmId) setFormErrors((prev) => ({ ...prev, rmId: undefined }))
-                  }}
-                  className={`h-8 w-full rounded border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring ${formErrors.rmId ? "border-destructive focus:ring-destructive" : "border-input"}`}
-                >
-                  {availableRMsForForm.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.code}) — {r.areaName}
-                    </option>
-                  ))}
-                </select>
-                {formErrors.rmId && (
-                  <p className="text-[11px] text-destructive">{formErrors.rmId}</p>
-                )}
+                <div className="flex items-center justify-between rounded border border-input bg-muted/30 px-3 py-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <UserRound className="size-3.5 text-primary shrink-0" />
+                    <span className="font-semibold text-foreground">
+                      {autoAssignedRM ? autoAssignedRM.name : "No RM Assigned"}
+                    </span>
+                    {autoAssignedRM && (
+                      <span className="font-mono text-[11px] text-primary">
+                        ({autoAssignedRM.code})
+                      </span>
+                    )}
+                  </div>
+                  {targetFormArea?.regionalOfficeName && (
+                    <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      <Building className="size-3 text-primary" />
+                      <span>{targetFormArea.regionalOfficeName}</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Automatically linked from the selected area&apos;s Regional Office.
+                </p>
               </div>
 
               {/* Action Buttons */}

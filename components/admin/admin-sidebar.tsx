@@ -9,6 +9,7 @@ import {
   ShoppingCart,
   Users,
   Package,
+  Building,
   Building2,
   MapPin,
   UserRound,
@@ -74,6 +75,11 @@ export const navItemsConfig: NavItemConfig[] = [
     icon: Building2,
   },
   {
+    title: "Regional Office",
+    href: "/regional-offices",
+    icon: Building,
+  },
+  {
     title: "Areas",
     href: "/areas",
     icon: MapPin,
@@ -89,7 +95,7 @@ export const navItemsConfig: NavItemConfig[] = [
     icon: UsersRound,
   },
   {
-    title: "Sales Officers",
+    title: "MPOs",
     href: "/officers",
     icon: UserCheck,
   },
@@ -125,7 +131,7 @@ export function AdminSidebar({ isOpen, onClose }: AdminSidebarProps) {
   const menuTitle = React.useMemo(() => {
     if (currentRole === "rm") return "Regional Manager Menu"
     if (currentRole === "am") return "Area Manager Menu"
-    if (currentRole === "officer") return "Sales Officer Menu"
+    if (currentRole === "officer") return "MPO Menu"
     return "Main Navigation"
   }, [currentRole])
 

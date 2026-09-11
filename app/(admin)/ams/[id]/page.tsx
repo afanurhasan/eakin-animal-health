@@ -17,10 +17,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FinancialSummary } from "@/components/admin/financial-summary"
+import { useAppState } from "@/lib/store"
 import {
-  initialAMs,
-  initialOfficers,
-  initialOfficerCustomers,
   getAMFinancialData,
   type AMItem,
 } from "@/lib/mock-data"
@@ -29,30 +27,35 @@ export default function AreaManagerDetailPage() {
   const params = useParams()
   const amId = (params?.id as string) || "am-1"
 
+  const { ams, officers, customers } = useAppState()
+
   // Find AM
   const am: AMItem = React.useMemo(() => {
     return (
-      initialAMs.find(
+      ams.find(
         (a) => a.id === amId || a.code.toLowerCase() === amId.toLowerCase()
-      ) || initialAMs[0]
+      ) || ams[0]
     )
-  }, [amId])
+  }, [ams, amId])
 
   // AM Financial Performance Data
   const financialData = React.useMemo(() => {
-    return getAMFinancialData(am.id)
-  }, [am.id])
+    return getAMFinancialData(am?.id || "am-1")
+  }, [am])
 
-  // Officers under this AM
+  // Officers (MPOs) under this AM
   const officersUnderAM = React.useMemo(() => {
-    return initialOfficers.filter((off) => off.amId === am.id)
-  }, [am.id])
+    if (!am) return []
+    return officers.filter((off) => off.amId === am.id)
+  }, [officers, am])
 
   // Customers under this AM's officers
   const totalCustomers = React.useMemo(() => {
     const officerIds = new Set(officersUnderAM.map((o) => o.id))
-    return initialOfficerCustomers.filter((c) => officerIds.has(c.officerId)).length
-  }, [officersUnderAM])
+    return customers.filter((c) => officerIds.has(c.officerId)).length
+  }, [customers, officersUnderAM])
+
+  if (!am) return null
 
   return (
     <div className="space-y-3.5">
@@ -98,10 +101,12 @@ export default function AreaManagerDetailPage() {
                     <Phone className="size-3 text-muted-foreground" />
                     <span>{am.phone}</span>
                   </span>
-                  <span className="flex items-center gap-1">
-                    <Mail className="size-3 text-muted-foreground" />
-                    <span>{am.email}</span>
-                  </span>
+                  {am.email && (
+                    <span className="flex items-center gap-1">
+                      <Mail className="size-3 text-muted-foreground" />
+                      <span>{am.email}</span>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -111,10 +116,10 @@ export default function AreaManagerDetailPage() {
           <div className="mt-3.5 grid grid-cols-2 gap-2.5 border-t border-border/60 pt-3">
             <div className="rounded border border-border/60 bg-muted/30 px-3 py-2">
               <span className="text-[11px] font-medium text-muted-foreground">
-                Sales Officers
+                MPOs
               </span>
               <p className="mt-0.5 text-base font-bold text-primary">
-                {officersUnderAM.length} <span className="text-xs font-normal text-muted-foreground">Officers</span>
+                {officersUnderAM.length} <span className="text-xs font-normal text-muted-foreground">MPOs</span>
               </p>
             </div>
             <div className="rounded border border-border/60 bg-muted/30 px-3 py-2">
@@ -135,13 +140,13 @@ export default function AreaManagerDetailPage() {
         title={`Financial Performance Summary (${am.name})`}
       />
 
-      {/* Section: Sales Officers Under this AM */}
+      {/* Section: MPOs Under this AM */}
       <Card className="border-border/80 bg-card shadow-xs">
         <CardHeader className="border-b border-border/70 px-4 py-2.5">
           <div className="flex items-center gap-2">
             <UserCheck className="size-4 text-primary" />
             <CardTitle className="text-xs font-semibold text-foreground sm:text-sm">
-              Sales Officers under {am.name} ({officersUnderAM.length})
+              MPOs under {am.name} ({officersUnderAM.length})
             </CardTitle>
           </div>
         </CardHeader>
@@ -155,10 +160,10 @@ export default function AreaManagerDetailPage() {
                     SL
                   </th>
                   <th scope="col" className="px-3.5 py-2.5">
-                    Officer Code
+                    MPO Code
                   </th>
                   <th scope="col" className="px-3.5 py-2.5">
-                    Officer Name
+                    MPO Name
                   </th>
                   <th scope="col" className="px-3.5 py-2.5">
                     Phone
@@ -228,7 +233,7 @@ export default function AreaManagerDetailPage() {
                       colSpan={7}
                       className="px-4 py-6 text-center text-xs text-muted-foreground"
                     >
-                      No Sales Officers assigned under this Area Manager.
+                      No MPOs assigned under this Area Manager.
                     </td>
                   </tr>
                 )}

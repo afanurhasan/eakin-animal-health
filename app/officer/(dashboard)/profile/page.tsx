@@ -67,8 +67,8 @@ export default function StaffProfilePage() {
         email: currentOfficer.email,
         pin: currentOfficer.pin || "123456",
         areaName: currentOfficer.areaName,
-        roleTitle: "Sales Officer",
-        roleBadge: "Officer",
+        roleTitle: "MPO",
+        roleBadge: "MPO",
         icon: UserCheck,
         parentSupervisor: currentOfficer.amName
           ? `AM: ${currentOfficer.amName} | RM: ${currentOfficer.rmName}`

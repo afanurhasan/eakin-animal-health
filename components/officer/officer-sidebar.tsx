@@ -68,7 +68,7 @@ export const rmNavItemsConfig: OfficerNavItemConfig[] = [
     icon: UsersRound,
   },
   {
-    title: "Sales Officers",
+    title: "MPOs",
     href: "/officers",
     icon: UserCheck,
   },
@@ -102,7 +102,7 @@ export const amNavItemsConfig: OfficerNavItemConfig[] = [
     icon: LayoutDashboard,
   },
   {
-    title: "Sales Officers",
+    title: "MPOs",
     href: "/officers",
     icon: UserCheck,
   },
@@ -149,7 +149,7 @@ export function OfficerSidebar({ isOpen, onClose }: OfficerSidebarProps) {
       ? "Regional Manager Menu"
       : currentRole === "am"
       ? "Area Manager Menu"
-      : "Sales Officer Menu"
+      : "MPO Menu"
 
   const homeHref =
     currentRole === "rm"

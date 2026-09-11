@@ -639,14 +639,14 @@ export default function DashboardPage() {
               <div>
                 <CardTitle className="text-sm font-semibold text-foreground flex items-center gap-2">
                   <UserCheck className="size-4 text-primary" />
-                  Sales Officer Performance Leaderboard
+                  MPO Performance Leaderboard
                 </CardTitle>
                 <CardDescription className="text-xs text-muted-foreground">
-                  Order volumes, sales generated and field collections per assigned officer
+                  Order volumes, sales generated and field collections per assigned MPO
                 </CardDescription>
               </div>
               <Link href="/officers" className="text-xs font-medium text-primary hover:underline">
-                View All Officers ({officers.length}) &rarr;
+                View All MPOs ({officers.length}) &rarr;
               </Link>
             </div>
           </CardHeader>
@@ -655,7 +655,7 @@ export default function DashboardPage() {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-border/70 bg-muted/30 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                    <th className="px-3.5 py-2.5">Sales Officer</th>
+                    <th className="px-3.5 py-2.5">MPO</th>
                     <th className="px-3 py-2.5">Territory / AM</th>
                     <th className="px-3 py-2.5 text-center">Orders</th>
                     <th className="px-3 py-2.5 text-right">Sales Volume</th>
@@ -841,7 +841,7 @@ export default function DashboardPage() {
                   <tr className="border-b border-border/70 bg-muted/30 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                     <th className="px-4 py-2.5">Date & Invoice</th>
                     <th className="px-3 py-2.5">Customer & Shop</th>
-                    <th className="px-3 py-2.5">Sales Officer</th>
+                    <th className="px-3 py-2.5">MPO</th>
                     <th className="px-3 py-2.5">Depot</th>
                     <th className="px-3 py-2.5 text-right">Grand Total</th>
                     <th className="px-3 py-2.5 text-center">Status</th>
@@ -1082,7 +1082,7 @@ export default function DashboardPage() {
                 <p className="text-muted-foreground">{selectedInvoice.address}</p>
               </div>
               <div>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase">Sales Officer & Depot</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase">MPO & Depot</p>
                 <p className="font-bold text-foreground">{selectedInvoice.officerName}</p>
                 <p className="text-muted-foreground">{selectedInvoice.depotName}</p>
                 <p className="text-muted-foreground">Phone: {selectedInvoice.phone}</p>

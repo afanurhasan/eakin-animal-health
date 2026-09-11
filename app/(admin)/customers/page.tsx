@@ -64,10 +64,6 @@ export default function CustomersPage() {
   const [editingCustomer, setEditingCustomer] = React.useState<CustomerItem | null>(null)
   const [deletingCustomer, setDeletingCustomer] = React.useState<CustomerItem | null>(null)
 
-  // Officer search state in modal
-  const [officerSearchQuery, setOfficerSearchQuery] = React.useState("")
-  const [isOfficerDropdownOpen, setIsOfficerDropdownOpen] = React.useState(false)
-  const officerDropdownRef = React.useRef<HTMLDivElement>(null)
 
   // Form input state
   const [formData, setFormData] = React.useState({
@@ -106,23 +102,33 @@ export default function CustomersPage() {
     return customers
   }, [customers, currentRole, currentRM, currentAM, currentOfficer])
 
-  // Dependent RMs for the Filter Bar
+  // Dependent RMs for the Filter Bar (via Regional Office)
   const availableRMsForFilter = React.useMemo(() => {
     if (selectedAreaFilter === "all") return rms
-    return rms.filter((r) => r.areaId === selectedAreaFilter)
-  }, [rms, selectedAreaFilter])
+    const selectedArea = areas.find((a) => a.id === selectedAreaFilter)
+    if (!selectedArea) return rms
+    const matched = rms.filter(
+      (r) => r.regionalOfficeId === selectedArea.regionalOfficeId || r.areaId === selectedArea.id
+    )
+    return matched.length > 0 ? matched : rms
+  }, [rms, areas, selectedAreaFilter])
 
   // Dependent AMs for the Filter Bar (For RM, only their own AMs)
   const availableAMsForFilter = React.useMemo(() => {
     if (currentRole === "rm" && currentRM) {
       return ams.filter((a) => a.rmId === currentRM.id || a.areaId === currentRM.areaId)
     }
+    const selectedArea = areas.find((a) => a.id === selectedAreaFilter)
     return ams.filter((a) => {
-      const matchArea = selectedAreaFilter === "all" || a.areaId === selectedAreaFilter
+      const amArea = areas.find((ar) => ar.id === a.areaId)
+      const matchArea =
+        selectedAreaFilter === "all" ||
+        a.areaId === selectedAreaFilter ||
+        (selectedArea && amArea && amArea.regionalOfficeId === selectedArea.regionalOfficeId)
       const matchRM = selectedRMFilter === "all" || a.rmId === selectedRMFilter
       return matchArea && matchRM
     })
-  }, [ams, currentRole, currentRM, selectedAreaFilter, selectedRMFilter])
+  }, [ams, areas, currentRole, currentRM, selectedAreaFilter, selectedRMFilter])
 
   // Dependent Officers for the Filter Bar (Scoped per role)
   const availableOfficersForFilter = React.useMemo(() => {
@@ -144,54 +150,11 @@ export default function CustomersPage() {
     })
   }, [officers, currentRole, currentRM, currentAM, selectedAreaFilter, selectedRMFilter, selectedAMFilter])
 
-  // Filtered Officers in Modal based on user typed search (by name, code, area, etc.)
-  const filteredOfficersForModal = React.useMemo(() => {
-    const q = officerSearchQuery.toLowerCase().trim()
-    if (!q) return officers
-    return officers.filter(
-      (o) =>
-        o.name.toLowerCase().includes(q) ||
-        o.code.toLowerCase().includes(q) ||
-        o.areaName.toLowerCase().includes(q) ||
-        o.amName.toLowerCase().includes(q) ||
-        o.rmName.toLowerCase().includes(q)
-    )
-  }, [officers, officerSearchQuery])
-
   // Currently selected officer in modal
   const selectedOfficerItem = React.useMemo(() => {
     if (!formData.officerId) return null
     return officers.find((o) => o.id === formData.officerId) || null
   }, [officers, formData.officerId])
-
-  // Handle selecting an officer from the search list
-  const handleSelectOfficer = (officer: SalesOfficerItem) => {
-    setFormData((prev) => ({
-      ...prev,
-      officerId: officer.id,
-      amId: officer.amId,
-      rmId: officer.rmId,
-      areaId: officer.areaId,
-    }))
-    setOfficerSearchQuery(`${officer.name} (${officer.code})`)
-    setIsOfficerDropdownOpen(false)
-  }
-
-  // Close officer dropdown when clicking outside
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        officerDropdownRef.current &&
-        !officerDropdownRef.current.contains(event.target as Node)
-      ) {
-        setIsOfficerDropdownOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [])
 
   // Reset cascade filters when parent filter changes
   React.useEffect(() => {
@@ -260,6 +223,8 @@ export default function CustomersPage() {
   const handleOpenCreate = () => {
     const nextCodeNumber = customers.length + 1
 
+    const defaultOfficer = officers[0]
+
     setFormData({
       code: `CUST-${String(nextCodeNumber).padStart(3, "0")}`,
       name: "",
@@ -267,13 +232,11 @@ export default function CustomersPage() {
       phone: "",
       email: "",
       address: "",
-      areaId: "",
-      rmId: "",
-      amId: "",
-      officerId: "",
+      officerId: defaultOfficer?.id || "off-1",
+      amId: defaultOfficer?.amId || "am-1",
+      rmId: defaultOfficer?.rmId || "rm-1",
+      areaId: defaultOfficer?.areaId || "area-1",
     })
-    setOfficerSearchQuery("")
-    setIsOfficerDropdownOpen(false)
     setFormError("")
     setFormErrors({})
     setIsCreateOpen(true)
@@ -282,7 +245,7 @@ export default function CustomersPage() {
   // Open Edit Modal
   const handleOpenEdit = (cust: CustomerItem) => {
     setEditingCustomer(cust)
-    const matchingOfficer = officers.find((o) => o.id === cust.officerId) || null
+    const matchingOfficer = officers.find((o) => o.id === cust.officerId) || officers[0]
     setFormData({
       code: cust.code,
       name: cust.name,
@@ -290,15 +253,11 @@ export default function CustomersPage() {
       phone: cust.phone,
       email: cust.email || "",
       address: cust.address,
-      areaId: cust.areaId,
-      rmId: cust.rmId,
-      amId: cust.amId,
-      officerId: cust.officerId,
+      areaId: cust.areaId || matchingOfficer?.areaId || "",
+      rmId: cust.rmId || matchingOfficer?.rmId || "",
+      amId: cust.amId || matchingOfficer?.amId || "",
+      officerId: cust.officerId || matchingOfficer?.id || "",
     })
-    setOfficerSearchQuery(
-      matchingOfficer ? `${matchingOfficer.name} (${matchingOfficer.code})` : ""
-    )
-    setIsOfficerDropdownOpen(false)
     setFormError("")
     setFormErrors({})
   }
@@ -332,7 +291,7 @@ export default function CustomersPage() {
       errors.address = "This field is required."
     }
     if (!formData.officerId) {
-      errors.officerId = "Please search and select an assigned Sales Officer."
+      errors.officerId = "Please search and select an assigned MPO."
     }
 
     if (
@@ -349,7 +308,7 @@ export default function CustomersPage() {
 
     const assignedOfficer = officers.find((o) => o.id === formData.officerId)
     if (!assignedOfficer) {
-      setFormErrors({ officerId: "Please select a valid Sales Officer." })
+      setFormErrors({ officerId: "Please select a valid MPO." })
       return
     }
 
@@ -469,7 +428,7 @@ export default function CustomersPage() {
                   ? "sm:grid-cols-3"
                   : currentRole === "am"
                   ? "sm:grid-cols-2"
-                  : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5"
+                  : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3"
               }`}
             >
               {/* 1. Area Wise Filter (Admin Only) */}
@@ -492,56 +451,18 @@ export default function CustomersPage() {
                 </div>
               )}
 
-              {/* 2. RM Wise Filter (Admin Only) */}
-              {currentRole === "admin" && (
-                <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                  <UserRound className="size-3.5 shrink-0 text-muted-foreground" />
-                  <select
-                    aria-label="Filter by RM"
-                    value={selectedRMFilter}
-                    onChange={(e) => setSelectedRMFilter(e.target.value)}
-                    className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
-                  >
-                    <option value="all">All RMs</option>
-                    {availableRMsForFilter.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name} ({r.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+            
 
-              {/* 3. AM Wise Filter (Admin and RM only) */}
-              {(currentRole === "admin" || currentRole === "rm") && (
-                <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                  <UsersRound className="size-3.5 shrink-0 text-muted-foreground" />
-                  <select
-                    aria-label="Filter by AM"
-                    value={selectedAMFilter}
-                    onChange={(e) => setSelectedAMFilter(e.target.value)}
-                    className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
-                  >
-                    <option value="all">All AMs</option>
-                    {availableAMsForFilter.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} ({a.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* 4. Sales Officer Filter (Admin, RM, AM) */}
+              {/* 4. MPO Filter (Admin, RM, AM) */}
               <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
                 <UserCheck className="size-3.5 shrink-0 text-muted-foreground" />
                 <select
-                  aria-label="Filter by Sales Officer"
+                  aria-label="Filter by MPO"
                   value={selectedOfficerFilter}
                   onChange={(e) => setSelectedOfficerFilter(e.target.value)}
                   className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
                 >
-                  <option value="all">All Officers</option>
+                  <option value="all">All MPOs</option>
                   {availableOfficersForFilter.map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.name} ({o.code})
@@ -891,165 +812,83 @@ export default function CustomersPage() {
                 )}
               </div>
 
-              {/* Sales Officer Assignment (Searchable & Auto-Assigned Hierarchy) */}
-              <div className="rounded border border-border/80 bg-muted/20 p-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground">
-                    Assigned Sales Officer
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    (AM & RM auto-assigned)
-                  </span>
-                </div>
-
-                {/* Searchable Officer Input */}
-                <div ref={officerDropdownRef} className="relative">
-                  <Label
-                    htmlFor="officerSearchInput"
-                    className="text-[11px] font-medium text-muted-foreground block mb-1"
-                  >
-                    Select Officer (Type name or code to search)
-                  </Label>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="officerSearchInput"
-                      type="text"
-                      value={officerSearchQuery}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setOfficerSearchQuery(val)
-                        setIsOfficerDropdownOpen(val.trim().length > 0)
-                        if (!val.trim()) {
-                          setFormData((prev) => ({
-                            ...prev,
-                            officerId: "",
-                            amId: "",
-                            rmId: "",
-                            areaId: "",
-                          }))
-                        }
-                        if (formErrors.officerId) {
-                          setFormErrors((prev) => ({ ...prev, officerId: undefined }))
-                        }
-                      }}
-                      placeholder="Type officer name or code (e.g. Arafat, OFF-001)..."
-                      className={`h-8 pl-8 pr-7 text-xs ${formErrors.officerId ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                      autoComplete="off"
-                    />
-                    {officerSearchQuery && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOfficerSearchQuery("")
-                          setIsOfficerDropdownOpen(false)
-                          setFormData((prev) => ({
-                            ...prev,
-                            officerId: "",
-                            amId: "",
-                            rmId: "",
-                            areaId: "",
-                          }))
-                        }}
-                        className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                      >
-                        <X className="size-3" />
-                      </button>
-                    )}
-                  </div>
-                  {formErrors.officerId && (
-                    <p className="text-[11px] text-destructive mt-1">{formErrors.officerId}</p>
-                  )}
-
-                  {/* Dropdown list of matching officers - ONLY shown when typing */}
-                  {isOfficerDropdownOpen && officerSearchQuery.trim().length > 0 && (
-                    <div className="absolute z-20 mt-1 max-h-48 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-lg text-xs">
-                      {filteredOfficersForModal.length > 0 ? (
-                        filteredOfficersForModal.map((off) => {
-                          const isSelected = off.id === formData.officerId
-                          return (
-                            <div
-                              key={off.id}
-                              onClick={() => {
-                                handleSelectOfficer(off)
-                                if (formErrors.officerId) {
-                                  setFormErrors((prev) => ({ ...prev, officerId: undefined }))
-                                }
-                              }}
-                              className={`flex cursor-pointer flex-col gap-0.5 rounded px-2.5 py-1.5 transition-colors ${
-                                isSelected
-                                  ? "bg-primary/10 text-primary font-medium"
-                                  : "hover:bg-muted text-foreground"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="font-semibold">
-                                  {off.name}
-                                </span>
-                                <span className="font-mono text-[10px] text-muted-foreground">
-                                  {off.code}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                <span>AM: <strong className="text-foreground">{off.amName}</strong></span>
-                                <span>•</span>
-                                <span>RM: <strong className="text-foreground">{off.rmName}</strong></span>
-                                <span>•</span>
-                                <span>Area: <strong className="text-foreground">{off.areaName}</strong></span>
-                              </div>
-                            </div>
-                          )
-                        })
-                      ) : (
-                        <div className="p-3 text-center text-xs text-muted-foreground">
-                          No sales officer found matching &ldquo;{officerSearchQuery}&rdquo;
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Auto-Assigned Hierarchy Preview Card */}
-                {selectedOfficerItem && (
-                  <div className="rounded border border-primary/20 bg-primary/5 p-2.5 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-primary flex items-center gap-1.5">
-                        <UserCheck className="size-3.5 text-primary" />
-                        <span>{selectedOfficerItem.name} ({selectedOfficerItem.code})</span>
-                      </span>
-                      <span className="font-mono text-[10px] text-muted-foreground">
-                        {selectedOfficerItem.phone}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 border-t border-primary/15 pt-1.5 text-[11px]">
-                      <div>
-                        <span className="text-[10px] text-muted-foreground block">
-                          Area Manager (AM)
-                        </span>
-                        <span className="font-medium text-foreground">
-                          {selectedOfficerItem.amName}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-muted-foreground block">
-                          Regional Manager (RM)
-                        </span>
-                        <span className="font-medium text-foreground">
-                          {selectedOfficerItem.rmName}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-muted-foreground block">
-                          Assigned Area
-                        </span>
-                        <span className="font-medium text-foreground">
-                          {selectedOfficerItem.areaName}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+              {/* Assigned MPO (Medical Promotion Officer) */}
+              <div className="space-y-1.5">
+                <Label htmlFor="custOfficer" className="text-xs font-medium text-foreground">
+                  Assigned MPO (Medical Promotion Officer)
+                </Label>
+                <select
+                  id="custOfficer"
+                  value={formData.officerId}
+                  onChange={(e) => {
+                    const newOfficerId = e.target.value
+                    const off = officers.find((o) => o.id === newOfficerId)
+                    setFormData((prev) => ({
+                      ...prev,
+                      officerId: newOfficerId,
+                      amId: off?.amId || prev.amId,
+                      rmId: off?.rmId || prev.rmId,
+                      areaId: off?.areaId || prev.areaId,
+                    }))
+                    if (formErrors.officerId) setFormErrors((prev) => ({ ...prev, officerId: undefined }))
+                  }}
+                  className={`h-8 w-full rounded border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring ${formErrors.officerId ? "border-destructive focus:ring-destructive" : "border-input"}`}
+                >
+                  {officers.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name} ({o.code}) — Area: {o.areaName}
+                    </option>
+                  ))}
+                </select>
+                {formErrors.officerId && (
+                  <p className="text-[11px] text-destructive">{formErrors.officerId}</p>
                 )}
+              </div>
+
+              {/* Auto-connected Territory & Management Card */}
+              <div className="space-y-2 rounded-lg border border-border/80 bg-muted/20 p-3">
+                <span className="text-[10.5px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                  Auto-Connected Territory & Management
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                  {/* Area */}
+                  <div className="flex items-center gap-2 rounded border border-input/60 bg-background/80 px-2.5 py-1.5">
+                    <MapPin className="size-3.5 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground leading-tight">Assigned Area</p>
+                      <p className="font-medium text-foreground truncate">
+                        {selectedOfficerItem?.areaName || "Unassigned"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* AM */}
+                  <div className="flex items-center gap-2 rounded border border-input/60 bg-background/80 px-2.5 py-1.5">
+                    <UserRound className="size-3.5 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground leading-tight">Area Manager (AM)</p>
+                      <p className="font-medium text-foreground truncate">
+                        {selectedOfficerItem?.amName || "Unassigned"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* RM */}
+                  <div className="flex items-center gap-2 rounded border border-input/60 bg-background/80 px-2.5 py-1.5">
+                    <UserCheck className="size-3.5 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground leading-tight">Regional Manager (RM)</p>
+                      <p className="font-medium text-foreground truncate">
+                        {selectedOfficerItem?.rmName || "Unassigned"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[10.5px] text-muted-foreground">
+                  Area Manager (AM), Regional Manager (RM), and Area are automatically connected from the selected MPO.
+                </p>
               </div>
 
               {/* Action Buttons */}

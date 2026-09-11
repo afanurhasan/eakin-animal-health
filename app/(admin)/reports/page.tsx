@@ -145,10 +145,10 @@ export default function ReportsPage() {
   const availableRMs = React.useMemo(() => {
     let list = rms
     if (areaFilter !== "all") {
-      list = list.filter((r) => r.areaId === areaFilter)
+      list = list.filter((r) => r.areaId === areaFilter || (r.regionalOfficeId && availableAreas.some(a => a.id === areaFilter && a.regionalOfficeId === r.regionalOfficeId)))
     } else if (depotFilter !== "all") {
       const allowedAreaIds = availableAreas.map((a) => a.id)
-      list = list.filter((r) => allowedAreaIds.includes(r.areaId))
+      list = list.filter((r) => (r.depotIds && r.depotIds.includes(depotFilter)) || (r.areaId && allowedAreaIds.includes(r.areaId)))
     }
     return list
   }, [rms, areaFilter, depotFilter, availableAreas])
@@ -593,7 +593,7 @@ export default function ReportsPage() {
         "Customer Name",
         "Customer Code",
         "Shop Name",
-        "Sales Officer",
+        "MPO",
         "Depot",
         "Items Count",
         "Subtotal (BDT)",
@@ -647,7 +647,7 @@ export default function ReportsPage() {
         "Shop Name",
         "Phone",
         "Area",
-        "Sales Officer",
+        "MPO",
         "Credit Limit (BDT)",
         "Outstanding Due (BDT)",
         "Total Orders",
@@ -884,17 +884,17 @@ export default function ReportsPage() {
                 </select>
               </div>
 
-              {/* 6. Sales Officer Filter */}
+              {/* 6. MPO Filter */}
               <div className="space-y-1">
                 <Label className="text-[11px] font-semibold text-muted-foreground">
-                  Sales Officer
+                  MPO
                 </Label>
                 <select
                   value={officerFilter}
                   onChange={(e) => setOfficerFilter(e.target.value)}
                   className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
                 >
-                  <option value="all">All Officers ({availableOfficers.length})</option>
+                  <option value="all">All MPOs ({availableOfficers.length})</option>
                   {availableOfficers.map((o) => (
                     <option key={o.id} value={o.id}>
                       {o.name} ({o.code})
@@ -1381,7 +1381,7 @@ export default function ReportsPage() {
                     <th className="px-3.5 py-2.5">Date</th>
                     <th className="px-3 py-2.5">Invoice No.</th>
                     <th className="px-3 py-2.5">Customer & Shop</th>
-                    <th className="px-3 py-2.5">Sales Officer</th>
+                    <th className="px-3 py-2.5">MPO</th>
                     <th className="px-3 py-2.5">Depot</th>
                     <th className="px-3 py-2.5 text-center">Items</th>
                     <th className="px-3 py-2.5 text-right">Subtotal</th>
@@ -1542,7 +1542,7 @@ export default function ReportsPage() {
                     <th className="px-3 py-2.5">Customer & Shop</th>
                     <th className="px-3 py-2.5">Phone</th>
                     <th className="px-3 py-2.5">Territory / Area</th>
-                    <th className="px-3 py-2.5">Sales Officer</th>
+                    <th className="px-3 py-2.5">MPO</th>
                     <th className="px-3 py-2.5 text-right">Credit Limit</th>
                     <th className="px-3 py-2.5 text-right">Outstanding Due</th>
                     <th className="px-3 py-2.5 text-right">Lifetime Sales</th>
@@ -1689,7 +1689,7 @@ export default function ReportsPage() {
                     <th className="px-3.5 py-2.5">Date</th>
                     <th className="px-3 py-2.5">Order Code</th>
                     <th className="px-3 py-2.5">Customer</th>
-                    <th className="px-3 py-2.5">Sales Officer</th>
+                    <th className="px-3 py-2.5">MPO</th>
                     <th className="px-3 py-2.5">Depot</th>
                     <th className="px-3 py-2.5 text-center">Items</th>
                     <th className="px-3 py-2.5 text-right">Grand Total</th>
@@ -1949,7 +1949,7 @@ export default function ReportsPage() {
                 <p className="text-muted-foreground">{modalInvoice.shopName}</p>
               </div>
               <div>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase">Sales Officer & Depot</p>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase">MPO & Depot</p>
                 <p className="font-bold text-foreground">{modalInvoice.officerName}</p>
                 <p className="text-muted-foreground">{modalInvoice.depotName}</p>
               </div>

@@ -52,7 +52,7 @@ function OfficerOrdersContent() {
     orders,
     catalog,
     depotStocks,
-    getOfficerAssignedDepot,
+    getOfficerAvailableDepots,
     createOrder,
   } = useAppState()
 
@@ -95,22 +95,38 @@ function OfficerOrdersContent() {
     return orders.filter((o) => o.officerId === currentOfficer.id)
   }, [orders, currentOfficer])
 
-  // Assigned Fulfillment Depot
-  const assignedDepot = React.useMemo(() => {
-    if (!currentOfficer) return null
-    return getOfficerAssignedDepot(currentOfficer.id)
-  }, [currentOfficer, getOfficerAssignedDepot])
+  // Available Fulfillment Depots for the MPO (connected via RM)
+  const availableDepots = React.useMemo(() => {
+    if (!currentOfficer) return []
+    return getOfficerAvailableDepots(currentOfficer.id)
+  }, [currentOfficer, getOfficerAvailableDepots])
 
-  // Stock inventory map for the assigned fulfillment depot
+  const [selectedDepotId, setSelectedDepotId] = React.useState<string>("")
+
+  // Auto-select depot on initialization or when available depots update
+  React.useEffect(() => {
+    if (availableDepots.length > 0) {
+      if (!selectedDepotId || !availableDepots.some((d) => d.id === selectedDepotId)) {
+        setSelectedDepotId(availableDepots[0].id)
+      }
+    }
+  }, [availableDepots, selectedDepotId])
+
+  // Active Fulfillment Depot
+  const activeFulfillmentDepot = React.useMemo(() => {
+    return availableDepots.find((d) => d.id === selectedDepotId) || availableDepots[0] || null
+  }, [availableDepots, selectedDepotId])
+
+  // Stock inventory map for the selected fulfillment depot
   const depotStockMap = React.useMemo(() => {
     const map: Record<string, number> = {}
-    if (assignedDepot && depotStocks[assignedDepot.id]) {
-      depotStocks[assignedDepot.id].forEach((item) => {
+    if (activeFulfillmentDepot && depotStocks[activeFulfillmentDepot.id]) {
+      depotStocks[activeFulfillmentDepot.id].forEach((item) => {
         map[item.productId] = item.quantity
       })
     }
     return map
-  }, [assignedDepot, depotStocks])
+  }, [activeFulfillmentDepot, depotStocks])
 
   // Selected customer object
   const selectedCustomer = React.useMemo(() => {
@@ -329,14 +345,12 @@ function OfficerOrdersContent() {
       return
     }
 
-    setIsSubmitting(true)
-
-    const depotToUse = assignedDepot || {
-      id: "dep-1",
-      name: "Dhaka Central Depot",
-      code: "DEP-DHA-01",
-      location: "Tejgaon Industrial Area, Dhaka",
+    if (!activeFulfillmentDepot) {
+      setCreateOrderError("Please select a valid fulfillment depot for this order.")
+      return
     }
+
+    setIsSubmitting(true)
 
     const created = createOrder({
       customerId: selectedCustomer.id,
@@ -348,8 +362,8 @@ function OfficerOrdersContent() {
       officerId: currentOfficer.id,
       officerCode: currentOfficer.code,
       officerName: currentOfficer.name,
-      depotId: depotToUse.id,
-      depotName: depotToUse.name,
+      depotId: activeFulfillmentDepot.id,
+      depotName: activeFulfillmentDepot.name,
       items: calculatedNewOrder.items,
       totalItems: calculatedNewOrder.totalItems,
       subtotal: calculatedNewOrder.subtotal,
@@ -792,13 +806,13 @@ function OfficerOrdersContent() {
 
                     <div>
                       <span className="text-muted-foreground block uppercase font-medium text-[10px]">
-                        Contact & Fulfillment
+                        Contact & Region
                       </span>
                       <span className="text-foreground text-xs font-mono mt-0.5 block">
                         {selectedCustomer.phone}
                       </span>
                       <span className="text-muted-foreground text-[11px] block truncate">
-                        Depot: <strong className="text-foreground">{assignedDepot?.name || "Dhaka Central Depot"}</strong>
+                        Area: <strong className="text-foreground">{selectedCustomer.areaName || currentOfficer?.areaName}</strong>
                       </span>
                     </div>
 
@@ -814,7 +828,46 @@ function OfficerOrdersContent() {
                 </div>
               )}
 
-              {/* Step 2: Product Search & Dynamic Order Line Items */}
+              {/* Step 2: Fulfillment Depot Selection */}
+              <div className="rounded-lg border border-border bg-card p-4 space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                  <div>
+                    <Label htmlFor="order-depot-select" className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <Building2 className="size-3.5 text-primary" />
+                      Fulfillment Depot *
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Select which depot fulfills this order. Live product availability below is based on this depot&apos;s stock.
+                    </p>
+                  </div>
+                  {availableDepots.length > 1 ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-[10px] font-semibold text-primary w-fit">
+                      {availableDepots.length} RM Depots Available
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground w-fit">
+                      Primary RM Depot
+                    </span>
+                  )}
+                </div>
+
+                <div className="pt-1">
+                  <select
+                    id="order-depot-select"
+                    value={selectedDepotId}
+                    onChange={(e) => setSelectedDepotId(e.target.value)}
+                    className="w-full h-9 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary font-medium"
+                  >
+                    {availableDepots.map((depot) => (
+                      <option key={depot.id} value={depot.id}>
+                        {depot.name} ({depot.code}) - {depot.location}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Step 3: Product Search & Dynamic Order Line Items */}
               {selectedCustomer && (
                 <div className="space-y-4 rounded-lg border border-border bg-card p-4">
                   {/* Search Input for Products */}
@@ -1209,12 +1262,12 @@ function OfficerOrdersContent() {
                     Representative & Fulfillment
                   </div>
                   <div className="text-xs">
-                    <span className="text-muted-foreground">Sales Officer: </span>
+                    <span className="text-muted-foreground">MPO: </span>
                     <span className="font-semibold text-foreground">{selectedInvoiceOrder.officerName}</span>
                     <span className="ml-1 font-mono text-[10px] text-muted-foreground">({selectedInvoiceOrder.officerCode})</span>
                   </div>
                   <div className="text-xs">
-                    <span className="text-muted-foreground">Assigned Depot: </span>
+                    <span className="text-muted-foreground">Fulfillment Depot: </span>
                     <span className="font-semibold text-foreground">{selectedInvoiceOrder.depotName}</span>
                   </div>
                 </div>

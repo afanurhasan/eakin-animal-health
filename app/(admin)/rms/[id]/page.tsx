@@ -8,10 +8,11 @@ import {
   UserRound,
   UsersRound,
   UserCheck,
+  Building,
+  Building2,
   MapPin,
   Phone,
   Mail,
-  Building2,
   ArrowRight,
   Users,
 } from "lucide-react"
@@ -19,11 +20,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { FinancialSummary } from "@/components/admin/financial-summary"
+import { useAppState } from "@/lib/store"
 import {
-  initialRMs,
-  initialAMs,
-  initialOfficers,
-  initialOfficerCustomers,
   getRMFinancialData,
   type RMItem,
 } from "@/lib/mock-data"
@@ -32,35 +30,57 @@ export default function RegionalManagerDetailPage() {
   const params = useParams()
   const rmId = (params?.id as string) || "rm-1"
 
+  const {
+    rms,
+    ams,
+    officers,
+    customers,
+    regionalOffices,
+    depots,
+  } = useAppState()
+
   // Find RM
   const rm: RMItem = React.useMemo(() => {
     return (
-      initialRMs.find(
+      rms.find(
         (r) => r.id === rmId || r.code.toLowerCase() === rmId.toLowerCase()
-      ) || initialRMs[0]
+      ) || rms[0]
     )
-  }, [rmId])
+  }, [rms, rmId])
 
   // RM Financial Performance Data
   const financialData = React.useMemo(() => {
-    return getRMFinancialData(rm.id)
-  }, [rm.id])
+    return getRMFinancialData(rm?.id || "rm-1")
+  }, [rm])
 
   // AMs under this RM
   const amsUnderRM = React.useMemo(() => {
-    return initialAMs.filter((am) => am.rmId === rm.id)
-  }, [rm.id])
+    if (!rm) return []
+    return ams.filter((am) => am.rmId === rm.id)
+  }, [ams, rm])
 
-  // Officers under this RM
+  // Officers (MPOs) under this RM
   const officersUnderRM = React.useMemo(() => {
-    return initialOfficers.filter((off) => off.rmId === rm.id)
-  }, [rm.id])
+    if (!rm) return []
+    return officers.filter((off) => off.rmId === rm.id)
+  }, [officers, rm])
 
   // Customers under this RM's officers
   const totalCustomers = React.useMemo(() => {
     const officerIds = new Set(officersUnderRM.map((o) => o.id))
-    return initialOfficerCustomers.filter((c) => officerIds.has(c.officerId)).length
-  }, [officersUnderRM])
+    return customers.filter((c) => officerIds.has(c.officerId)).length
+  }, [customers, officersUnderRM])
+
+  const connectedDepots = React.useMemo(() => {
+    if (!rm) return []
+    const ids = rm.depotIds || (rm.id === "rm-2" ? ["dep-2", "dep-1"] : ["dep-1"])
+    return ids.map((id) => {
+      const d = depots.find((x) => x.id === id)
+      return d ? d.name : id
+    })
+  }, [rm, depots])
+
+  if (!rm) return null
 
   return (
     <div className="space-y-3.5">
@@ -95,17 +115,31 @@ export default function RegionalManagerDetailPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    <MapPin className="size-3 text-muted-foreground" />
-                    <span>Assigned Area: <strong className="text-foreground">{rm.areaName}</strong></span>
+                    <Building className="size-3 text-primary" />
+                    <span>Regional Office: <strong className="text-foreground">{rm.regionalOfficeName || "Bogura Regional Office"}</strong></span>
                   </span>
                   <span className="flex items-center gap-1 font-mono">
                     <Phone className="size-3 text-muted-foreground" />
                     <span>{rm.phone}</span>
                   </span>
-                  <span className="flex items-center gap-1">
-                    <Mail className="size-3 text-muted-foreground" />
-                    <span>{rm.email}</span>
-                  </span>
+                  {rm.email && (
+                    <span className="flex items-center gap-1">
+                      <Mail className="size-3 text-muted-foreground" />
+                      <span>{rm.email}</span>
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+                  <span className="text-muted-foreground text-[11px]">Connected Depots:</span>
+                  {connectedDepots.map((dName, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 rounded-sm border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-foreground"
+                    >
+                      <Building2 className="size-3 text-primary" />
+                      <span>{dName}</span>
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -123,10 +157,10 @@ export default function RegionalManagerDetailPage() {
             </div>
             <div className="rounded border border-border/60 bg-muted/30 px-3 py-2">
               <span className="text-[11px] font-medium text-muted-foreground">
-                Sales Officers
+                MPOs
               </span>
               <p className="mt-0.5 text-base font-bold text-primary">
-                {officersUnderRM.length} <span className="text-xs font-normal text-muted-foreground">Officers</span>
+                {officersUnderRM.length} <span className="text-xs font-normal text-muted-foreground">MPOs</span>
               </p>
             </div>
             <div className="col-span-2 rounded border border-border/60 bg-muted/30 px-3 py-2 sm:col-span-1">
@@ -234,7 +268,7 @@ export default function RegionalManagerDetailPage() {
                       colSpan={6}
                       className="px-4 py-6 text-center text-xs text-muted-foreground"
                     >
-                      No Area Managers assigned under this Regional Manager.
+                      No Area Managers assigned under this RM.
                     </td>
                   </tr>
                 )}
@@ -244,13 +278,13 @@ export default function RegionalManagerDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Section 2: Sales Officers Under this RM */}
+      {/* Section 2: MPOs Under this RM */}
       <Card className="border-border/80 bg-card shadow-xs">
         <CardHeader className="border-b border-border/70 px-4 py-2.5">
           <div className="flex items-center gap-2">
             <UserCheck className="size-4 text-primary" />
             <CardTitle className="text-xs font-semibold text-foreground sm:text-sm">
-              Sales Officers in this Region ({officersUnderRM.length})
+              MPOs in this Region ({officersUnderRM.length})
             </CardTitle>
           </div>
         </CardHeader>
@@ -264,10 +298,10 @@ export default function RegionalManagerDetailPage() {
                     SL
                   </th>
                   <th scope="col" className="px-3.5 py-2.5">
-                    Officer Code
+                    MPO Code
                   </th>
                   <th scope="col" className="px-3.5 py-2.5">
-                    Officer Name
+                    MPO Name
                   </th>
                   <th scope="col" className="px-3.5 py-2.5">
                     Assigned AM
@@ -337,7 +371,7 @@ export default function RegionalManagerDetailPage() {
                       colSpan={7}
                       className="px-4 py-6 text-center text-xs text-muted-foreground"
                     >
-                      No Sales Officers assigned in this region.
+                      No MPOs assigned in this region.
                     </td>
                   </tr>
                 )}

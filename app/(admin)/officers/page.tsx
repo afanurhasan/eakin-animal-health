@@ -11,6 +11,7 @@ import {
   UserCheck,
   UserRound,
   UsersRound,
+  Building,
   Filter,
   X,
   AlertTriangle,
@@ -21,6 +22,7 @@ import {
   Eye,
   EyeOff,
   KeyRound,
+  Warehouse,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -93,23 +95,33 @@ export default function SalesOfficersPage() {
     return officers
   }, [officers, currentRole, currentRM, currentAM])
 
-  // Dependent RMs for the Filter Bar
+  // Dependent RMs for the Filter Bar (via Regional Office)
   const availableRMsForFilter = React.useMemo(() => {
     if (selectedAreaFilter === "all") return rms
-    return rms.filter((r) => r.areaId === selectedAreaFilter)
-  }, [rms, selectedAreaFilter])
+    const selectedArea = areas.find((a) => a.id === selectedAreaFilter)
+    if (!selectedArea) return rms
+    const matched = rms.filter(
+      (r) => r.regionalOfficeId === selectedArea.regionalOfficeId || r.areaId === selectedArea.id
+    )
+    return matched.length > 0 ? matched : rms
+  }, [rms, areas, selectedAreaFilter])
 
   // Dependent AMs for the Filter Bar
   const availableAMsForFilter = React.useMemo(() => {
     if (currentRole === "rm" && currentRM) {
       return ams.filter((a) => a.rmId === currentRM.id || a.areaId === currentRM.areaId)
     }
+    const selectedArea = areas.find((a) => a.id === selectedAreaFilter)
     return ams.filter((a) => {
-      const matchArea = selectedAreaFilter === "all" || a.areaId === selectedAreaFilter
+      const amArea = areas.find((ar) => ar.id === a.areaId)
+      const matchArea =
+        selectedAreaFilter === "all" ||
+        a.areaId === selectedAreaFilter ||
+        (selectedArea && amArea && amArea.regionalOfficeId === selectedArea.regionalOfficeId)
       const matchRM = selectedRMFilter === "all" || a.rmId === selectedRMFilter
       return matchArea && matchRM
     })
-  }, [ams, currentRole, currentRM, selectedAreaFilter, selectedRMFilter])
+  }, [ams, areas, currentRole, currentRM, selectedAreaFilter, selectedRMFilter])
 
   // Reset filter selections if parent filter changes
   React.useEffect(() => {
@@ -151,51 +163,26 @@ export default function SalesOfficersPage() {
     })
   }, [roleBaseOfficers, searchQuery, currentRole, selectedAreaFilter, selectedRMFilter, selectedAMFilter])
 
-  // Dependent RMs for the Form based on formData.areaId
-  const availableRMsForForm = React.useMemo(() => {
-    const matched = rms.filter((r) => r.areaId === formData.areaId)
-    return matched.length > 0 ? matched : rms
-  }, [rms, formData.areaId])
+  // Target AM for the form
+  const targetFormAM = React.useMemo(() => {
+    return ams.find((a) => a.id === formData.amId) || ams[0] || null
+  }, [ams, formData.amId])
 
-  // Dependent AMs for the Form based on formData.areaId and formData.rmId
-  const availableAMsForForm = React.useMemo(() => {
-    const matched = ams.filter(
-      (a) => a.areaId === formData.areaId && a.rmId === formData.rmId
+  // Automatically matched Area for the form based on targetFormAM's Area
+  const targetFormArea = React.useMemo(() => {
+    if (!targetFormAM) return null
+    return areas.find((a) => a.id === targetFormAM.areaId) || null
+  }, [areas, targetFormAM])
+
+  // Automatically matched RM for the form based on targetFormAM's RM
+  const targetFormRM = React.useMemo(() => {
+    if (!targetFormAM) return null
+    return (
+      rms.find((r) => r.id === targetFormAM.rmId) ||
+      rms.find((r) => r.regionalOfficeId === targetFormArea?.regionalOfficeId) ||
+      null
     )
-    if (matched.length > 0) return matched
-    const areaMatched = ams.filter((a) => a.areaId === formData.areaId)
-    return areaMatched.length > 0 ? areaMatched : ams
-  }, [ams, formData.areaId, formData.rmId])
-
-  // Handle Area Change in Form (cascades to RM and AM)
-  const handleFormAreaChange = (newAreaId: string) => {
-    const matchedRMs = rms.filter((r) => r.areaId === newAreaId)
-    const newRMId = matchedRMs[0]?.id || rms[0]?.id || "rm-1"
-
-    const matchedAMs = ams.filter((a) => a.areaId === newAreaId && a.rmId === newRMId)
-    const newAMId = matchedAMs[0]?.id || ams[0]?.id || "am-1"
-
-    setFormData((prev) => ({
-      ...prev,
-      areaId: newAreaId,
-      rmId: newRMId,
-      amId: newAMId,
-    }))
-  }
-
-  // Handle RM Change in Form (cascades to AM)
-  const handleFormRMChange = (newRMId: string) => {
-    const matchedAMs = ams.filter(
-      (a) => a.areaId === formData.areaId && a.rmId === newRMId
-    )
-    const newAMId = matchedAMs[0]?.id || ams[0]?.id || "am-1"
-
-    setFormData((prev) => ({
-      ...prev,
-      rmId: newRMId,
-      amId: newAMId,
-    }))
-  }
+  }, [rms, targetFormAM, targetFormArea])
 
   const [formErrors, setFormErrors] = React.useState<{
     code?: string
@@ -203,19 +190,18 @@ export default function SalesOfficersPage() {
     phone?: string
     pin?: string
     email?: string
-    areaId?: string
-    rmId?: string
     amId?: string
   }>({})
 
   // Open Create Modal
   const handleOpenCreate = () => {
     const nextCodeNumber = officers.length + 1
-    const defaultArea = areas[0]?.id || "1"
-    const matchedRMs = rms.filter((r) => r.areaId === defaultArea)
-    const defaultRM = matchedRMs[0]?.id || rms[0]?.id || "rm-1"
-    const matchedAMs = ams.filter((a) => a.areaId === defaultArea && a.rmId === defaultRM)
-    const defaultAM = matchedAMs[0]?.id || ams[0]?.id || "am-1"
+    const defaultAM = ams[0]
+    const matchedArea = areas.find((a) => a.id === defaultAM?.areaId)
+    const matchedRM =
+      rms.find((r) => r.id === defaultAM?.rmId) ||
+      rms.find((r) => r.regionalOfficeId === matchedArea?.regionalOfficeId) ||
+      rms[0]
 
     setFormData({
       code: `OFF-${String(nextCodeNumber).padStart(3, "0")}`,
@@ -223,9 +209,9 @@ export default function SalesOfficersPage() {
       phone: "",
       pin: "123456",
       email: "",
-      areaId: defaultArea,
-      rmId: defaultRM,
-      amId: defaultAM,
+      amId: defaultAM?.id || "am-1",
+      areaId: defaultAM?.areaId || "area-1",
+      rmId: matchedRM?.id || "rm-1",
     })
     setShowPinModal(false)
     setFormError("")
@@ -236,15 +222,16 @@ export default function SalesOfficersPage() {
   // Open Edit Modal
   const handleOpenEdit = (off: SalesOfficerItem) => {
     setEditingOfficer(off)
+    const matchedAM = ams.find((a) => a.id === off.amId) || ams[0]
     setFormData({
       code: off.code,
       name: off.name,
       phone: off.phone,
       pin: off.pin || "123456",
       email: off.email || "",
+      amId: off.amId || matchedAM?.id || "am-1",
       areaId: off.areaId,
       rmId: off.rmId,
-      amId: off.amId,
     })
     setShowPinModal(false)
     setFormError("")
@@ -260,8 +247,6 @@ export default function SalesOfficersPage() {
       phone?: string
       pin?: string
       email?: string
-      areaId?: string
-      rmId?: string
       amId?: string
     } = {}
 
@@ -276,12 +261,6 @@ export default function SalesOfficersPage() {
     }
     if (!formData.pin || formData.pin.length !== 6 || !/^\d{6}$/.test(formData.pin)) {
       errors.pin = "PIN must be exactly 6 numeric digits."
-    }
-    if (!formData.areaId) {
-      errors.areaId = "This field is required."
-    }
-    if (!formData.rmId) {
-      errors.rmId = "This field is required."
     }
     if (!formData.amId) {
       errors.amId = "This field is required."
@@ -299,13 +278,19 @@ export default function SalesOfficersPage() {
       return
     }
 
-    const assignedArea = areas.find((a) => a.id === formData.areaId)
-    const assignedRM = rms.find((r) => r.id === formData.rmId)
-    const assignedAM = ams.find((a) => a.id === formData.amId)
+    const assignedAM = ams.find((a) => a.id === formData.amId) || ams[0]
+    const assignedArea = areas.find((a) => a.id === assignedAM?.areaId)
+    const assignedRM =
+      rms.find((r) => r.id === assignedAM?.rmId) ||
+      rms.find((r) => r.regionalOfficeId === assignedArea?.regionalOfficeId) ||
+      rms[0]
 
-    const areaName = assignedArea ? assignedArea.name : "Unassigned"
-    const rmName = assignedRM ? assignedRM.name : "Unassigned"
-    const amName = assignedAM ? assignedAM.name : "Unassigned"
+    const areaId = assignedArea?.id || assignedAM?.areaId || ""
+    const areaName = assignedArea?.name || assignedAM?.areaName || "Unassigned"
+    const rmId = assignedRM?.id || assignedAM?.rmId || ""
+    const rmName = assignedRM?.name || assignedAM?.rmName || "Unassigned"
+    const amId = assignedAM?.id || ""
+    const amName = assignedAM?.name || "Unassigned"
 
     if (editingOfficer) {
       updateOfficer(editingOfficer.id, {
@@ -314,31 +299,31 @@ export default function SalesOfficersPage() {
         phone: formData.phone.trim(),
         pin: formData.pin.trim(),
         email: formData.email.trim(),
-        areaId: formData.areaId,
+        areaId,
         areaName,
-        rmId: formData.rmId,
+        rmId,
         rmName,
-        amId: formData.amId,
+        amId,
         amName,
       })
       setEditingOfficer(null)
-      showToast("Sales Officer updated successfully.")
+      showToast("MPO updated successfully.")
     } else {
       addOfficer({
-        code: formData.code.trim().toUpperCase() || `OFF-${String(officers.length + 1).padStart(3, "0")}`,
+        code: formData.code.trim().toUpperCase() || `MPO-${String(officers.length + 1).padStart(3, "0")}`,
         name: formData.name.trim(),
         phone: formData.phone.trim(),
         pin: formData.pin.trim() || "123456",
         email: formData.email.trim(),
-        areaId: formData.areaId,
+        areaId,
         areaName,
-        rmId: formData.rmId,
+        rmId,
         rmName,
-        amId: formData.amId,
+        amId,
         amName,
       })
       setIsCreateOpen(false)
-      showToast("New Sales Officer added successfully with 6-digit login PIN.")
+      showToast("New MPO added successfully with 6-digit login PIN.")
     }
     setFormErrors({})
     setFormError("")
@@ -349,7 +334,7 @@ export default function SalesOfficersPage() {
     if (!deletingOfficer) return
     deleteOfficer(deletingOfficer.id)
     setDeletingOfficer(null)
-    showToast("Sales Officer deleted successfully.")
+    showToast("MPO deleted successfully.")
   }
 
   return (
@@ -366,14 +351,14 @@ export default function SalesOfficersPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Sales Officers
+            MPOs
           </h2>
           <p className="text-xs text-muted-foreground">
-            Manage sales officers and their assigned areas, regional managers and area managers.
+            Manage MPOs and their assigned areas, regional managers and area managers.
           </p>
         </div>
 
-        {/* Add Officer Button (Admin Only) */}
+        {/* Add MPO Button (Admin Only) */}
         {currentRole === "admin" && (
           <Button
             type="button"
@@ -382,7 +367,7 @@ export default function SalesOfficersPage() {
             className="cursor-pointer gap-1.5 font-medium shadow-xs"
           >
             <Plus className="size-4" />
-            <span>Add Officer</span>
+            <span>Add MPO</span>
           </Button>
         )}
       </div>
@@ -393,7 +378,7 @@ export default function SalesOfficersPage() {
           <div className="flex flex-col gap-3.5">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-semibold text-foreground">
-                Sales Officers ({filteredOfficers.length})
+                MPOs ({filteredOfficers.length})
               </CardTitle>
             </div>
 
@@ -404,7 +389,7 @@ export default function SalesOfficersPage() {
                   ? "sm:grid-cols-2"
                   : currentRole === "am"
                   ? "sm:grid-cols-1"
-                  : "sm:grid-cols-2 lg:grid-cols-4"
+                  : "sm:grid-cols-2 lg:grid-cols-2"
               }`}
             >
               {/* 1. Area Wise Filter (Admin Only) */}
@@ -427,45 +412,6 @@ export default function SalesOfficersPage() {
                 </div>
               )}
 
-              {/* 2. RM Wise Filter (Admin Only) */}
-              {currentRole === "admin" && (
-                <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                  <UserRound className="size-3.5 shrink-0 text-muted-foreground" />
-                  <select
-                    aria-label="RM Wise Filter"
-                    value={selectedRMFilter}
-                    onChange={(e) => setSelectedRMFilter(e.target.value)}
-                    className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
-                  >
-                    <option value="all">All RMs</option>
-                    {availableRMsForFilter.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name} ({r.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* 3. AM Wise Filter (Admin and RM only) */}
-              {(currentRole === "admin" || currentRole === "rm") && (
-                <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
-                  <UsersRound className="size-3.5 shrink-0 text-muted-foreground" />
-                  <select
-                    aria-label="AM Wise Filter"
-                    value={selectedAMFilter}
-                    onChange={(e) => setSelectedAMFilter(e.target.value)}
-                    className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
-                  >
-                    <option value="all">All AMs</option>
-                    {availableAMsForFilter.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} ({a.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
 
               {/* 4. Search Bar */}
               <div className="relative">
@@ -632,7 +578,7 @@ export default function SalesOfficersPage() {
                       colSpan={9}
                       className="px-4 py-8 text-center text-xs text-muted-foreground"
                     >
-                      No sales officers found.
+                      No MPOs found.
                     </td>
                   </tr>
                 )}
@@ -666,7 +612,7 @@ export default function SalesOfficersPage() {
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border/60 pb-3">
               <h3 id="officer-modal-title" className="text-base font-semibold text-foreground">
-                {editingOfficer ? "Edit Sales Officer" : "Add Sales Officer"}
+                {editingOfficer ? "Edit MPO" : "Add MPO"}
               </h3>
               <Button
                 type="button"
@@ -821,79 +767,87 @@ export default function SalesOfficersPage() {
                 )}
               </div>
 
-              {/* 1. Assigned Area (Cascades to RM and AM) */}
-              <div className="space-y-1.5">
-                <Label htmlFor="officerArea" className="text-xs font-medium text-foreground">
-                  1. Assigned Area
-                </Label>
-                <select
-                  id="officerArea"
-                  value={formData.areaId}
-                  onChange={(e) => {
-                    handleFormAreaChange(e.target.value)
-                    if (formErrors.areaId) setFormErrors((prev) => ({ ...prev, areaId: undefined }))
-                  }}
-                  className={`h-8 w-full rounded border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring ${formErrors.areaId ? "border-destructive focus:ring-destructive" : "border-input"}`}
-                >
-                  {areas.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({a.code})
-                    </option>
-                  ))}
-                </select>
-                {formErrors.areaId && (
-                  <p className="text-[11px] text-destructive">{formErrors.areaId}</p>
-                )}
-              </div>
-
-              {/* 2. Assigned RM (Dependent on Area) */}
-              <div className="space-y-1.5">
-                <Label htmlFor="officerRM" className="text-xs font-medium text-foreground">
-                  2. Assigned Regional Manager (RM)
-                </Label>
-                <select
-                  id="officerRM"
-                  value={formData.rmId}
-                  onChange={(e) => {
-                    handleFormRMChange(e.target.value)
-                    if (formErrors.rmId) setFormErrors((prev) => ({ ...prev, rmId: undefined }))
-                  }}
-                  className={`h-8 w-full rounded border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring ${formErrors.rmId ? "border-destructive focus:ring-destructive" : "border-input"}`}
-                >
-                  {availableRMsForForm.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.code}) — {r.areaName}
-                    </option>
-                  ))}
-                </select>
-                {formErrors.rmId && (
-                  <p className="text-[11px] text-destructive">{formErrors.rmId}</p>
-                )}
-              </div>
-
-              {/* 3. Assigned AM (Dependent on Area and RM) */}
+              {/* Assigned Area Manager (AM) */}
               <div className="space-y-1.5">
                 <Label htmlFor="officerAM" className="text-xs font-medium text-foreground">
-                  3. Assigned Area Manager (AM)
+                  Assigned Area Manager (AM)
                 </Label>
                 <select
                   id="officerAM"
                   value={formData.amId}
                   onChange={(e) => {
-                    setFormData((prev) => ({ ...prev, amId: e.target.value }))
+                    const newAmId = e.target.value
+                    const matchedAM = ams.find((a) => a.id === newAmId)
+                    const matchedArea = areas.find((a) => a.id === matchedAM?.areaId)
+                    const matchedRM =
+                      rms.find((r) => r.id === matchedAM?.rmId) ||
+                      rms.find((r) => r.regionalOfficeId === matchedArea?.regionalOfficeId) ||
+                      rms[0]
+                    setFormData((prev) => ({
+                      ...prev,
+                      amId: newAmId,
+                      areaId: matchedAM?.areaId || prev.areaId,
+                      rmId: matchedRM?.id || prev.rmId,
+                    }))
                     if (formErrors.amId) setFormErrors((prev) => ({ ...prev, amId: undefined }))
                   }}
                   className={`h-8 w-full rounded border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring ${formErrors.amId ? "border-destructive focus:ring-destructive" : "border-input"}`}
                 >
-                  {availableAMsForForm.map((a) => (
+                  {ams.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.name} ({a.code}) — RM: {a.rmName}
+                      {a.name} ({a.code}) — Area: {a.areaName}
                     </option>
                   ))}
                 </select>
                 {formErrors.amId && (
                   <p className="text-[11px] text-destructive">{formErrors.amId}</p>
                 )}
+              </div>
+
+              {/* Auto-connected Hierarchy Card */}
+              <div className="space-y-2 rounded-lg border border-border/80 bg-muted/20 p-3">
+                <span className="text-[10.5px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                  Auto-Connected Territory & Management
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {/* Area */}
+                  <div className="flex items-center gap-2 rounded border border-input/60 bg-background/80 px-2.5 py-1.5">
+                    <MapPin className="size-3.5 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground leading-tight">Assigned Area</p>
+                      <p className="font-medium text-foreground truncate">
+                        {targetFormArea ? `${targetFormArea.name} (${targetFormArea.code})` : (targetFormAM?.areaName || "Unassigned")}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* RM */}
+                  <div className="flex items-center gap-2 rounded border border-input/60 bg-background/80 px-2.5 py-1.5">
+                    <UserRound className="size-3.5 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground leading-tight">Regional Manager (RM)</p>
+                      <p className="font-medium text-foreground truncate">
+                        {targetFormRM ? `${targetFormRM.name} (${targetFormRM.code})` : (targetFormAM?.rmName || "Unassigned")}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Depot */}
+                  <div className="flex items-center gap-2 rounded border border-input/60 bg-background/80 px-2.5 py-1.5 sm:col-span-2">
+                    <Warehouse className="size-3.5 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground leading-tight">Assigned Depot</p>
+                      <p className="font-medium text-foreground truncate">
+                        {targetFormArea?.depotName || "Bogura Central Depot"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[10.5px] text-muted-foreground">
+                  Area, RM, and Depot are automatically resolved from the selected Area Manager (AM).
+                </p>
               </div>
 
               {/* Action Buttons */}
@@ -953,7 +907,7 @@ export default function SalesOfficersPage() {
                   Confirm Delete
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Are you sure you want to delete this Sales Officer?
+                  Are you sure you want to delete this MPO?
                 </p>
                 <div className="mt-2 rounded border border-border/80 bg-muted/40 p-2 text-xs">
                   <span className="font-mono font-semibold text-primary">

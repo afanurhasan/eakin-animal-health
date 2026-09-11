@@ -237,7 +237,7 @@ export default function HomePage() {
                 href="/officer/login"
                 className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
               >
-                <span>Sales Officer? Sign In to Officer Portal</span>
+                <span>MPO / Field Staff? Sign In to Portal</span>
                 <ArrowRight className="size-3" />
               </Link>
             </div>

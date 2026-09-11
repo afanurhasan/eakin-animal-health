@@ -581,12 +581,12 @@ export default function OfficerDashboardPage() {
                     Representative & Fulfillment
                   </div>
                   <div className="text-xs">
-                    <span className="text-muted-foreground">Sales Officer: </span>
+                    <span className="text-muted-foreground">MPO: </span>
                     <span className="font-semibold text-foreground">{selectedInvoiceOrder.officerName}</span>
                     <span className="ml-1 font-mono text-[10px] text-muted-foreground">({selectedInvoiceOrder.officerCode})</span>
                   </div>
                   <div className="text-xs">
-                    <span className="text-muted-foreground">Assigned Depot: </span>
+                    <span className="text-muted-foreground">Fulfillment Depot: </span>
                     <span className="font-semibold text-foreground">{selectedInvoiceOrder.depotName}</span>
                   </div>
                 </div>

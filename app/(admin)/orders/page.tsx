@@ -367,7 +367,7 @@ export default function OrdersPage() {
             Orders
           </h2>
           <p className="text-xs text-muted-foreground">
-            Review customer orders submitted by Sales Officers, apply approval discounts, and assign bonus quantities.
+            Review customer orders submitted by MPOs, apply approval discounts, and assign bonus quantities.
           </p>
         </div>
       </div>
@@ -450,16 +450,16 @@ export default function OrdersPage() {
 
             {/* Coordinated Filters + Search Bar */}
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-              {/* 1. Sales Officer Filter */}
+              {/* 1. MPO Filter */}
               <div className="flex items-center gap-1.5 rounded border border-border/80 bg-muted/20 px-2 py-1">
                 <UserCheck className="size-3.5 shrink-0 text-muted-foreground" />
                 <select
-                  aria-label="Filter by Sales Officer"
+                  aria-label="Filter by MPO"
                   value={officerFilter}
                   onChange={(e) => setOfficerFilter(e.target.value)}
                   className="h-7 w-full bg-transparent text-xs text-foreground outline-none cursor-pointer"
                 >
-                  <option value="all">All Sales Officers</option>
+                  <option value="all">All MPOs</option>
                   {visibleOfficers.map((off) => (
                     <option key={off.id} value={off.id}>
                       {off.name} ({off.code})
@@ -502,7 +502,7 @@ export default function OrdersPage() {
                     Customer & Shop
                   </th>
                   <th scope="col" className="px-4 py-3">
-                    Sales Officer
+                    MPO
                   </th>
                   <th scope="col" className="px-4 py-3 text-right">
                     Total Amount
@@ -798,12 +798,12 @@ export default function OrdersPage() {
                     Fulfillment & Representative
                   </div>
                   <div className="text-xs">
-                    <span className="text-muted-foreground">Sales Officer: </span>
+                    <span className="text-muted-foreground">MPO: </span>
                     <span className="font-semibold text-foreground">{selectedInvoiceOrder.officerName}</span>
                     <span className="ml-1 font-mono text-[10px] text-muted-foreground">({selectedInvoiceOrder.officerCode})</span>
                   </div>
                   <div className="text-xs">
-                    <span className="text-muted-foreground">Assigned Depot: </span>
+                    <span className="text-muted-foreground">Fulfillment Depot: </span>
                     <span className="font-semibold text-foreground">{selectedInvoiceOrder.depotName}</span>
                   </div>
                 </div>
@@ -1089,12 +1089,12 @@ export default function OrdersPage() {
                       Fulfillment & Representative
                     </div>
                     <div className="text-xs">
-                      <span className="text-muted-foreground">Sales Officer: </span>
+                      <span className="text-muted-foreground">MPO: </span>
                       <span className="font-semibold text-foreground">{approvingOrder.officerName}</span>
                       <span className="ml-1 font-mono text-[10px] text-muted-foreground">({approvingOrder.officerCode})</span>
                     </div>
                     <div className="text-xs">
-                      <span className="text-muted-foreground">Assigned Depot: </span>
+                      <span className="text-muted-foreground">Fulfillment Depot: </span>
                       <span className="font-semibold text-foreground">{approvingOrder.depotName}</span>
                     </div>
                     <div className="text-xs">
@@ -1178,10 +1178,10 @@ export default function OrdersPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                             <UserCheck className="size-3.5 text-primary" />
-                            <span>Sales Officer Discount</span>
+                            <span>MPO Discount</span>
                           </span>
                           <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                            From Officer
+                            From MPO
                           </span>
                         </div>
                         <p className="text-[11px] text-muted-foreground">

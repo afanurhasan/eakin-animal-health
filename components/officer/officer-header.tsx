@@ -48,7 +48,7 @@ export function OfficerHeader({ onOpenSidebar }: OfficerHeaderProps) {
   const pageTitle = React.useMemo(() => {
     if (pathname === "/officer/rm/dashboard") return "Regional Manager Dashboard"
     if (pathname === "/officer/am/dashboard") return "Area Manager Dashboard"
-    if (pathname === "/officer/dashboard") return "Sales Officer Dashboard"
+    if (pathname === "/officer/dashboard") return "MPO Dashboard"
     if (pathname === "/officer/profile") return "My Profile & PIN Settings"
 
     const currentItem = activeNavConfig.find(
@@ -64,14 +64,14 @@ export function OfficerHeader({ onOpenSidebar }: OfficerHeaderProps) {
     if (pathname.includes("/customers")) return "Customers"
     if (pathname.includes("/orders")) return "Orders"
     if (pathname.includes("/stock")) return "Stock"
-    if (pathname.includes("/officers")) return "Sales Officers"
+    if (pathname.includes("/officers")) return "MPOs"
     if (pathname.includes("/ams")) return "Area Managers"
 
     return currentRole === "rm"
       ? "RM Panel"
       : currentRole === "am"
       ? "AM Panel"
-      : "Officer Panel"
+      : "MPO Panel"
   }, [pathname, activeNavConfig, currentRole])
 
   // Current active user info for badge

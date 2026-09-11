@@ -8,6 +8,7 @@ import {
   initialDepots,
   initialDepotStocks,
   initialAreasWithDepot,
+  initialRegionalOffices,
   initialRMs,
   initialAMs,
   productCatalog,
@@ -18,8 +19,10 @@ import {
   type Order,
   type CustomerItem,
   type SalesOfficerItem,
+  type MPOItem,
   type Depot,
   type DepotStockItem,
+  type RegionalOffice,
   type AreaItem,
   type RMItem,
   type AMItem,
@@ -37,6 +40,8 @@ const STORAGE_KEYS = {
   OFFICERS: "eakin_erp_officers_v2",
   AMS: "eakin_erp_ams_v2",
   RMS: "eakin_erp_rms_v2",
+  REGIONAL_OFFICES: "eakin_erp_regional_offices_v2",
+  AREAS: "eakin_erp_areas_v2",
   DEPOT_STOCKS: "eakin_erp_depot_stocks_v2",
   COLLECTIONS: "eakin_erp_collections_v2",
   PRODUCT_RETURNS: "eakin_erp_returns_v2",
@@ -62,6 +67,7 @@ interface AppStateContextType {
   officers: SalesOfficerItem[]
   depots: Depot[]
   depotStocks: Record<string, DepotStockItem[]>
+  regionalOffices: RegionalOffice[]
   areas: AreaItem[]
   rms: RMItem[]
   ams: AMItem[]
@@ -92,6 +98,16 @@ interface AppStateContextType {
     newPin: string
   ) => { success: boolean; message: string }
 
+  // Regional Office Mutations (Admin)
+  addRegionalOffice: (ro: Omit<RegionalOffice, "id">) => RegionalOffice
+  updateRegionalOffice: (id: string, updates: Partial<RegionalOffice>) => void
+  deleteRegionalOffice: (id: string) => void
+
+  // Area Mutations (Admin)
+  addArea: (area: Omit<AreaItem, "id">) => AreaItem
+  updateArea: (id: string, updates: Partial<AreaItem>) => void
+  deleteArea: (id: string) => void
+
   // Staff Mutations (Admin)
   addOfficer: (off: Omit<SalesOfficerItem, "id">) => SalesOfficerItem
   updateOfficer: (id: string, updates: Partial<SalesOfficerItem>) => void
@@ -102,6 +118,7 @@ interface AppStateContextType {
   addRM: (rm: Omit<RMItem, "id">) => RMItem
   updateRM: (id: string, updates: Partial<RMItem>) => void
   deleteRM: (id: string) => void
+  assignRMToRegionalOffice: (roId: string, rmId: string | null) => void
 
   // Order Mutations
   createOrder: (orderData: Omit<Order, "id" | "code" | "date" | "status">) => Order
@@ -117,8 +134,14 @@ interface AppStateContextType {
   updateCustomer: (id: string, updates: Partial<CustomerItem>) => void
   deleteCustomer: (id: string) => void
 
+  addCollection: (col: Omit<CollectionItem, "id" | "code" | "date">) => CollectionItem
+  addProductReturn: (ret: Omit<ProductReturnItem, "id" | "code" | "date">) => ProductReturnItem
+  addStockTransfer: (transfer: Omit<StockTransfer, "id" | "code" | "date" | "status">) => StockTransfer
+  addStockMovement: (movement: Omit<StockMovement, "id" | "date">) => StockMovement
+
   // Helpers
   getOfficerAssignedDepot: (officerId: string) => Depot | null
+  getOfficerAvailableDepots: (officerId: string) => Depot[]
 }
 
 const AppStateContext = React.createContext<AppStateContextType | undefined>(undefined)
@@ -126,13 +149,14 @@ const AppStateContext = React.createContext<AppStateContextType | undefined>(und
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [isLoaded, setIsLoaded] = React.useState(false)
 
-  // Core State
+  // Core State (Strict 2 depots, 2 regional offices, 2 RMs, 2 AMs, 2 MPOs, 4 customers, 4 areas)
   const [orders, setOrders] = React.useState<Order[]>(initialOrders)
   const [customers, setCustomers] = React.useState<CustomerItem[]>(initialCustomers)
   const [officers, setOfficers] = React.useState<SalesOfficerItem[]>(initialOfficers)
   const [depots] = React.useState<Depot[]>(initialDepots)
   const [depotStocks, setDepotStocks] = React.useState<Record<string, DepotStockItem[]>>(initialDepotStocks)
-  const [areas] = React.useState<AreaItem[]>(initialAreasWithDepot)
+  const [regionalOffices, setRegionalOffices] = React.useState<RegionalOffice[]>(initialRegionalOffices)
+  const [areas, setAreas] = React.useState<AreaItem[]>(initialAreasWithDepot)
   const [rms, setRms] = React.useState<RMItem[]>(initialRMs)
   const [ams, setAms] = React.useState<AMItem[]>(initialAMs)
   const [catalog] = React.useState<Product[]>(productCatalog)
@@ -150,42 +174,133 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   // Hydrate from localStorage on mount
   React.useEffect(() => {
     try {
+      // Clean up legacy keys
+      const legacyKeys = [
+        "eakin_erp_orders", "eakin_erp_orders_v2",
+        "eakin_erp_customers", "eakin_erp_customers_v2",
+        "eakin_erp_officers", "eakin_erp_officers_v2",
+        "eakin_erp_ams", "eakin_erp_ams_v2",
+        "eakin_erp_rms", "eakin_erp_rms_v2",
+        "eakin_erp_regional_offices", "eakin_erp_regional_offices_v2",
+        "eakin_erp_areas", "eakin_erp_areas_v2",
+        "eakin_erp_depot_stocks", "eakin_erp_depot_stocks_v2",
+        "eakin_erp_collections", "eakin_erp_collections_v2",
+        "eakin_erp_returns", "eakin_erp_returns_v2",
+      ]
+      legacyKeys.forEach((k) => {
+        try { localStorage.removeItem(k) } catch (_) {}
+      })
+
       const storedOrders = localStorage.getItem(STORAGE_KEYS.ORDERS)
-      if (storedOrders) setOrders(JSON.parse(storedOrders))
+      if (storedOrders) {
+        try {
+          const parsedOrders: Order[] = JSON.parse(storedOrders)
+          setOrders(parsedOrders)
+        } catch (_) {}
+      }
 
       const storedCustomers = localStorage.getItem(STORAGE_KEYS.CUSTOMERS)
-      if (storedCustomers) setCustomers(JSON.parse(storedCustomers))
+      if (storedCustomers) {
+        try {
+          let parsedCustomers: CustomerItem[] = JSON.parse(storedCustomers)
+          // Ensure strictly up to initialCustomers without excess items
+          const validIds = new Set(initialCustomers.map((c) => c.id))
+          if (parsedCustomers.some((c) => !validIds.has(c.id)) || parsedCustomers.length !== initialCustomers.length) {
+            parsedCustomers = initialCustomers
+            localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(initialCustomers))
+          }
+          setCustomers(parsedCustomers)
+        } catch (_) {}
+      }
 
       const storedOfficers = localStorage.getItem(STORAGE_KEYS.OFFICERS)
       if (storedOfficers) {
-        const parsedOfficers: SalesOfficerItem[] = JSON.parse(storedOfficers)
-        // Ensure every officer has a pin
-        setOfficers(parsedOfficers.map(o => ({ ...o, pin: o.pin || "123456" })))
+        try {
+          let parsedOfficers: SalesOfficerItem[] = JSON.parse(storedOfficers)
+          const validIds = new Set(initialOfficers.map((o) => o.id))
+          if (parsedOfficers.some((o) => !validIds.has(o.id)) || parsedOfficers.length !== initialOfficers.length) {
+            parsedOfficers = initialOfficers
+            localStorage.setItem(STORAGE_KEYS.OFFICERS, JSON.stringify(initialOfficers))
+          }
+          setOfficers(parsedOfficers.map((o) => ({ ...o, pin: o.pin || "123456" })))
+        } catch (_) {}
       }
 
       const storedAMs = localStorage.getItem(STORAGE_KEYS.AMS)
       if (storedAMs) {
-        const parsedAMs: AMItem[] = JSON.parse(storedAMs)
-        setAms(parsedAMs.map(a => ({ ...a, pin: a.pin || "123456" })))
+        try {
+          let parsedAMs: AMItem[] = JSON.parse(storedAMs)
+          const validIds = new Set(initialAMs.map((a) => a.id))
+          if (parsedAMs.some((a) => !validIds.has(a.id)) || parsedAMs.length !== initialAMs.length) {
+            parsedAMs = initialAMs
+            localStorage.setItem(STORAGE_KEYS.AMS, JSON.stringify(initialAMs))
+          }
+          setAms(parsedAMs.map((a) => ({ ...a, pin: a.pin || "123456" })))
+        } catch (_) {}
       }
 
       const storedRMs = localStorage.getItem(STORAGE_KEYS.RMS)
       if (storedRMs) {
-        const parsedRMs: RMItem[] = JSON.parse(storedRMs)
-        setRms(parsedRMs.map(r => ({ ...r, pin: r.pin || "123456" })))
+        try {
+          let parsedRMs: RMItem[] = JSON.parse(storedRMs)
+          const validIds = new Set(initialRMs.map((r) => r.id))
+          if (parsedRMs.some((r) => !validIds.has(r.id)) || parsedRMs.length !== initialRMs.length) {
+            parsedRMs = initialRMs
+            localStorage.setItem(STORAGE_KEYS.RMS, JSON.stringify(initialRMs))
+          }
+          setRms(parsedRMs)
+        } catch (_) {}
+      }
+
+      const storedROs = localStorage.getItem(STORAGE_KEYS.REGIONAL_OFFICES)
+      if (storedROs) {
+        try {
+          let parsedROs: RegionalOffice[] = JSON.parse(storedROs)
+          const validIds = new Set(initialRegionalOffices.map((r) => r.id))
+          if (parsedROs.some((r) => !validIds.has(r.id)) || parsedROs.length !== initialRegionalOffices.length) {
+            parsedROs = initialRegionalOffices
+            localStorage.setItem(STORAGE_KEYS.REGIONAL_OFFICES, JSON.stringify(initialRegionalOffices))
+          }
+          setRegionalOffices(parsedROs)
+        } catch (_) {}
+      }
+
+      const storedAreas = localStorage.getItem(STORAGE_KEYS.AREAS)
+      if (storedAreas) {
+        try {
+          let parsedAreas: AreaItem[] = JSON.parse(storedAreas)
+          const validIds = new Set(initialAreasWithDepot.map((a) => a.id))
+          if (parsedAreas.some((a) => !validIds.has(a.id)) || parsedAreas.length !== initialAreasWithDepot.length) {
+            parsedAreas = initialAreasWithDepot
+            localStorage.setItem(STORAGE_KEYS.AREAS, JSON.stringify(initialAreasWithDepot))
+          }
+          setAreas(parsedAreas)
+        } catch (_) {}
       }
 
       const storedStocks = localStorage.getItem(STORAGE_KEYS.DEPOT_STOCKS)
       if (storedStocks) setDepotStocks(JSON.parse(storedStocks))
 
       const storedOfficerId = localStorage.getItem(STORAGE_KEYS.CURRENT_OFFICER_ID)
-      if (storedOfficerId) setCurrentOfficerId(storedOfficerId)
+      if (storedOfficerId && ["off-1", "off-2"].includes(storedOfficerId)) {
+        setCurrentOfficerId(storedOfficerId)
+      } else {
+        setCurrentOfficerId("off-1")
+      }
 
       const storedAMId = localStorage.getItem(STORAGE_KEYS.CURRENT_AM_ID)
-      if (storedAMId) setCurrentAMId(storedAMId)
+      if (storedAMId && ["am-1", "am-2"].includes(storedAMId)) {
+        setCurrentAMId(storedAMId)
+      } else {
+        setCurrentAMId("am-1")
+      }
 
       const storedRMId = localStorage.getItem(STORAGE_KEYS.CURRENT_RM_ID)
-      if (storedRMId) setCurrentRMId(storedRMId)
+      if (storedRMId && ["rm-1", "rm-2"].includes(storedRMId)) {
+        setCurrentRMId(storedRMId)
+      } else {
+        setCurrentRMId("rm-1")
+      }
 
       const storedRole = localStorage.getItem(STORAGE_KEYS.CURRENT_ROLE) as StaffRole | null
       if (storedRole && ["admin", "officer", "am", "rm"].includes(storedRole)) {
@@ -243,6 +358,24 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       console.error(e)
     }
   }, [rms, isLoaded])
+
+  React.useEffect(() => {
+    if (!isLoaded) return
+    try {
+      localStorage.setItem(STORAGE_KEYS.REGIONAL_OFFICES, JSON.stringify(regionalOffices))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [regionalOffices, isLoaded])
+
+  React.useEffect(() => {
+    if (!isLoaded) return
+    try {
+      localStorage.setItem(STORAGE_KEYS.AREAS, JSON.stringify(areas))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [areas, isLoaded])
 
   React.useEffect(() => {
     if (!isLoaded) return
@@ -572,6 +705,51 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setAms((prev) => prev.filter((a) => a.id !== id))
   }, [])
 
+  // Regional Office Mutations (Admin)
+  const addRegionalOffice = React.useCallback(
+    (roData: Omit<RegionalOffice, "id">): RegionalOffice => {
+      const newRO: RegionalOffice = {
+        ...roData,
+        id: `ro-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      }
+      setRegionalOffices((prev) => [newRO, ...prev])
+      return newRO
+    },
+    []
+  )
+
+  const updateRegionalOffice = React.useCallback(
+    (id: string, updates: Partial<RegionalOffice>) => {
+      setRegionalOffices((prev) => prev.map((ro) => (ro.id === id ? { ...ro, ...updates } : ro)))
+    },
+    []
+  )
+
+  const deleteRegionalOffice = React.useCallback((id: string) => {
+    setRegionalOffices((prev) => prev.filter((ro) => ro.id !== id))
+  }, [])
+
+  // Area Mutations (Admin)
+  const addArea = React.useCallback(
+    (areaData: Omit<AreaItem, "id">): AreaItem => {
+      const newArea: AreaItem = {
+        ...areaData,
+        id: `area-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      }
+      setAreas((prev) => [newArea, ...prev])
+      return newArea
+    },
+    []
+  )
+
+  const updateArea = React.useCallback((id: string, updates: Partial<AreaItem>) => {
+    setAreas((prev) => prev.map((a) => (a.id === id ? { ...a, ...updates } : a)))
+  }, [])
+
+  const deleteArea = React.useCallback((id: string) => {
+    setAreas((prev) => prev.filter((a) => a.id !== id))
+  }, [])
+
   const addRM = React.useCallback(
     (rmData: Omit<RMItem, "id">): RMItem => {
       const newRM: RMItem = {
@@ -579,31 +757,101 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         id: `rm-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         pin: rmData.pin || "123456",
       }
-      setRms((prev) => [newRM, ...prev])
+      setRms((prev) => {
+        const targetROId = newRM.regionalOfficeId
+        const updated = prev.map((r) => {
+          if (targetROId && r.regionalOfficeId === targetROId) {
+            return { ...r, regionalOfficeId: "", regionalOfficeName: "" }
+          }
+          return r
+        })
+        return [newRM, ...updated]
+      })
       return newRM
     },
     []
   )
 
   const updateRM = React.useCallback((id: string, updates: Partial<RMItem>) => {
-    setRms((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)))
+    setRms((prev) => {
+      const targetROId = updates.regionalOfficeId
+      return prev.map((r) => {
+        if (r.id === id) {
+          return { ...r, ...updates }
+        }
+        if (targetROId && r.regionalOfficeId === targetROId) {
+          return { ...r, regionalOfficeId: "", regionalOfficeName: "" }
+        }
+        return r
+      })
+    })
   }, [])
 
   const deleteRM = React.useCallback((id: string) => {
     setRms((prev) => prev.filter((r) => r.id !== id))
   }, [])
 
-  // Helper: Find officer assigned depot through area hierarchy
+  const assignRMToRegionalOffice = React.useCallback(
+    (roId: string, rmId: string | null) => {
+      setRms((prev) => {
+        const targetRO = regionalOffices.find((o) => o.id === roId)
+        const roName = targetRO ? targetRO.name : ""
+        return prev.map((r) => {
+          if (rmId && r.id === rmId) {
+            return { ...r, regionalOfficeId: roId, regionalOfficeName: roName }
+          }
+          if (r.regionalOfficeId === roId) {
+            return { ...r, regionalOfficeId: "", regionalOfficeName: "" }
+          }
+          return r
+        })
+      })
+    },
+    [regionalOffices]
+  )
+
+  // Helper: Retrieve Depots available for an MPO based on RM connected depots
+  const getOfficerAvailableDepots = React.useCallback(
+    (officerId: string): Depot[] => {
+      const off = officers.find((o) => o.id === officerId)
+      if (!off) return depots
+
+      // Priority 1: Match directly via RM on officer
+      let rm = rms.find((r) => r.id === off.rmId)
+
+      // Priority 2: Match via AM -> RM
+      if (!rm && off.amId) {
+        const am = ams.find((a) => a.id === off.amId)
+        if (am && am.rmId) {
+          rm = rms.find((r) => r.id === am.rmId)
+        }
+      }
+
+      // Priority 3: Match via Area -> Regional Office -> RM
+      if (!rm && off.areaId) {
+        const area = areas.find((a) => a.id === off.areaId)
+        if (area && area.regionalOfficeId) {
+          rm = rms.find((r) => r.regionalOfficeId === area.regionalOfficeId)
+        }
+      }
+
+      if (rm && Array.isArray(rm.depotIds) && rm.depotIds.length > 0) {
+        const connected = depots.filter((d) => rm!.depotIds.includes(d.id))
+        if (connected.length > 0) return connected
+      }
+
+      return depots.length > 0 ? [depots[0]] : []
+    },
+    [officers, rms, ams, areas, depots]
+  )
+
+  // Helper: Find officer default assigned depot through available depots
   const getOfficerAssignedDepot = React.useCallback(
     (officerId: string): Depot | null => {
-      const off = officers.find((o) => o.id === officerId)
-      if (!off) return depots[0] || null
-      const area = areas.find((a) => a.id === off.areaId)
-      if (!area) return depots[0] || null
-      const depot = depots.find((d) => d.id === area.depotId)
-      return depot || depots[0] || null
+      const available = getOfficerAvailableDepots(officerId)
+      return available[0] || depots[0] || null
     },
-    [officers, areas, depots]
+    [getOfficerAvailableDepots, depots]
   )
 
   // Order Mutations
@@ -692,6 +940,62 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setCustomers((prev) => prev.filter((c) => c.id !== id))
   }, [])
 
+  const addCollection = React.useCallback(
+    (col: Omit<CollectionItem, "id" | "code" | "date">): CollectionItem => {
+      const newCol: CollectionItem = {
+        ...col,
+        id: `col-${Date.now()}`,
+        code: `COL-${String(collections.length + 1).padStart(3, "0")}`,
+        date: new Date().toISOString().split("T")[0],
+      }
+      setCollections((prev) => [newCol, ...prev])
+      return newCol
+    },
+    [collections.length]
+  )
+
+  const addProductReturn = React.useCallback(
+    (ret: Omit<ProductReturnItem, "id" | "code" | "date">): ProductReturnItem => {
+      const newRet: ProductReturnItem = {
+        ...ret,
+        id: `ret-${Date.now()}`,
+        code: `RET-${String(productReturns.length + 1).padStart(3, "0")}`,
+        date: new Date().toISOString().split("T")[0],
+      }
+      setProductReturns((prev) => [newRet, ...prev])
+      return newRet
+    },
+    [productReturns.length]
+  )
+
+  const addStockTransfer = React.useCallback(
+    (transfer: Omit<StockTransfer, "id" | "code" | "date" | "status">): StockTransfer => {
+      const newTransfer: StockTransfer = {
+        ...transfer,
+        id: `tr-${Date.now()}`,
+        code: `TR-${String(transfers.length + 1).padStart(3, "0")}`,
+        date: new Date().toISOString().split("T")[0],
+        status: "Completed",
+      }
+      setTransfers((prev) => [newTransfer, ...prev])
+      return newTransfer
+    },
+    [transfers.length]
+  )
+
+  const addStockMovement = React.useCallback(
+    (movement: Omit<StockMovement, "id" | "date">): StockMovement => {
+      const newMovement: StockMovement = {
+        ...movement,
+        id: `sm-${Date.now()}`,
+        date: new Date().toISOString().split("T")[0],
+      }
+      setMovements((prev) => [newMovement, ...prev])
+      return newMovement
+    },
+    []
+  )
+
   return (
     <AppStateContext.Provider
       value={{
@@ -700,6 +1004,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         officers,
         depots,
         depotStocks,
+        regionalOffices,
         areas,
         rms,
         ams,
@@ -721,6 +1026,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         logoutOfficer,
         logoutStaff,
         verifyAndChangePin,
+        addRegionalOffice,
+        updateRegionalOffice,
+        deleteRegionalOffice,
+        addArea,
+        updateArea,
+        deleteArea,
         addOfficer,
         updateOfficer,
         deleteOfficer,
@@ -730,13 +1041,19 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         addRM,
         updateRM,
         deleteRM,
+        assignRMToRegionalOffice,
         createOrder,
         approveOrder,
         cancelOrder,
         addCustomer,
         updateCustomer,
         deleteCustomer,
+        addCollection,
+        addProductReturn,
+        addStockTransfer,
+        addStockMovement,
         getOfficerAssignedDepot,
+        getOfficerAvailableDepots,
       }}
     >
       {children}

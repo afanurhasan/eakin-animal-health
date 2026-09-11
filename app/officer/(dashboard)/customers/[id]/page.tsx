@@ -149,7 +149,7 @@ export default function OfficerCustomerDetailPage() {
             Access Restricted: This customer is not assigned to your territory.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Sales Officers can only access customers assigned to their territory.
+            MPOs can only access customers assigned to their territory.
           </p>
           <Link href="/officer/customers" className="mt-4 inline-block">
             <Button size="sm" variant="outline">
@@ -269,11 +269,11 @@ export default function OfficerCustomerDetailPage() {
               </p>
             </div>
 
-            {/* 4. Sales Officer */}
+            {/* 4. MPO */}
             <div className="rounded border border-primary/30 bg-primary/5 px-3 py-2 space-y-0.5">
               <span className="flex items-center gap-1 text-[11px] font-medium text-primary">
                 <UserCheck className="size-3 text-primary" />
-                Assigned Sales Officer
+                Assigned MPO
               </span>
               <p className="text-xs font-semibold text-foreground">
                 {customer.officerName}

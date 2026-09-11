@@ -147,7 +147,7 @@ export default function RMDashboardPage() {
             </span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Supervising Region: <strong className="text-foreground">{rm.areaName}</strong> &bull; Total Area Managers: <strong className="text-foreground">{rmAMs.length}</strong> &bull; Sales Officers: <strong className="text-foreground">{rmOfficers.length}</strong>
+            Supervising Region: <strong className="text-foreground">{rm.areaName}</strong> &bull; Total Area Managers: <strong className="text-foreground">{rmAMs.length}</strong> &bull; MPOs: <strong className="text-foreground">{rmOfficers.length}</strong>
           </p>
         </div>
 
@@ -208,7 +208,7 @@ export default function RMDashboardPage() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground">
-                Field Sales Officers
+                Field MPOs
               </span>
               <div className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
                 <UserCheck className="size-4" />
@@ -320,10 +320,10 @@ export default function RMDashboardPage() {
             <div className="rounded border border-border/70 bg-muted/20 px-3 py-2 space-y-0.5">
               <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                 <UserCheck className="size-3 text-muted-foreground" />
-                Active Sales Officers
+                Active MPOs
               </span>
               <p className="text-xs font-semibold text-foreground">
-                {rmOfficers.length} Officers Reporting
+                {rmOfficers.length} MPOs Reporting
               </p>
             </div>
 
@@ -384,7 +384,7 @@ export default function RMDashboardPage() {
                     Customer & Shop
                   </th>
                   <th scope="col" className="px-4 py-3">
-                    Sales Officer
+                    MPO
                   </th>
                   <th scope="col" className="px-4 py-3 text-right">
                     Total Amount
@@ -627,12 +627,12 @@ export default function RMDashboardPage() {
                     Representative & Fulfillment
                   </div>
                   <div className="text-xs">
-                    <span className="text-muted-foreground">Sales Officer: </span>
+                    <span className="text-muted-foreground">MPO: </span>
                     <span className="font-semibold text-foreground">{selectedInvoiceOrder.officerName}</span>
                     <span className="ml-1 font-mono text-[10px] text-muted-foreground">({selectedInvoiceOrder.officerCode})</span>
                   </div>
                   <div className="text-xs">
-                    <span className="text-muted-foreground">Assigned Depot: </span>
+                    <span className="text-muted-foreground">Fulfillment Depot: </span>
                     <span className="font-semibold text-foreground">{selectedInvoiceOrder.depotName}</span>
                   </div>
                 </div>

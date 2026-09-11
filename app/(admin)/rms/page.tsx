@@ -7,15 +7,15 @@ import {
   Search,
   Pencil,
   Trash2,
-  MapPin,
+  Building,
+  Building2,
   UserRound,
   Filter,
   X,
   AlertTriangle,
   CheckCircle2,
-  ArrowRight,
-  Mail,
   Phone,
+  Mail,
   Eye,
   EyeOff,
   KeyRound,
@@ -26,15 +26,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAppState } from "@/lib/store"
-import {
-  type RMItem,
-  type AreaItem,
-} from "@/lib/mock-data"
+import { type RMItem } from "@/lib/mock-data"
 
 export default function RegionalManagersPage() {
   const {
     rms,
-    areas,
+    regionalOffices,
+    depots,
     addRM,
     updateRM,
     deleteRM,
@@ -42,7 +40,7 @@ export default function RegionalManagersPage() {
 
   // Filter States
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [selectedAreaFilter, setSelectedAreaFilter] = React.useState("all")
+  const [selectedROFilter, setSelectedROFilter] = React.useState("all")
 
   // Modal States
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
@@ -50,14 +48,23 @@ export default function RegionalManagersPage() {
   const [deletingRM, setDeletingRM] = React.useState<RMItem | null>(null)
   const [showPinModal, setShowPinModal] = React.useState(false)
 
-  // Form input state
-  const [formData, setFormData] = React.useState({
+  // Form input state: 1 Regional Office, Multiple Depots
+  const [formData, setFormData] = React.useState<{
+    code: string
+    name: string
+    phone: string
+    pin: string
+    email: string
+    regionalOfficeId: string
+    depotIds: string[]
+  }>({
     code: "",
     name: "",
     phone: "",
     pin: "123456",
     email: "",
-    areaId: areas[0]?.id || "1",
+    regionalOfficeId: regionalOffices[0]?.id || "ro-1",
+    depotIds: [depots[0]?.id || "dep-1"],
   })
   const [formError, setFormError] = React.useState("")
   const [toastMessage, setToastMessage] = React.useState<string | null>(null)
@@ -78,14 +85,15 @@ export default function RegionalManagersPage() {
         rm.name.toLowerCase().includes(q) ||
         rm.code.toLowerCase().includes(q) ||
         rm.phone.toLowerCase().includes(q) ||
-        rm.email.toLowerCase().includes(q)
+        rm.email.toLowerCase().includes(q) ||
+        (rm.regionalOfficeName && rm.regionalOfficeName.toLowerCase().includes(q))
 
-      const matchesArea =
-        selectedAreaFilter === "all" || rm.areaId === selectedAreaFilter
+      const matchesRO =
+        selectedROFilter === "all" || rm.regionalOfficeId === selectedROFilter
 
-      return matchesSearch && matchesArea
+      return matchesSearch && matchesRO
     })
-  }, [rms, searchQuery, selectedAreaFilter])
+  }, [rms, searchQuery, selectedROFilter])
 
   const [formErrors, setFormErrors] = React.useState<{
     code?: string
@@ -93,19 +101,24 @@ export default function RegionalManagersPage() {
     phone?: string
     pin?: string
     email?: string
-    areaId?: string
+    regionalOfficeId?: string
+    depotIds?: string
   }>({})
 
   // Open Create Modal
   const handleOpenCreate = () => {
     const nextCodeNumber = rms.length + 1
+    const defaultRO = regionalOffices[0]
+    const defaultDepotId = defaultRO?.depotId || depots[0]?.id || "dep-1"
+
     setFormData({
       code: `RM-${String(nextCodeNumber).padStart(3, "0")}`,
       name: "",
       phone: "",
       pin: "123456",
       email: "",
-      areaId: areas[0]?.id || "1",
+      regionalOfficeId: defaultRO?.id || "ro-1",
+      depotIds: [defaultDepotId],
     })
     setShowPinModal(false)
     setFormError("")
@@ -116,17 +129,42 @@ export default function RegionalManagersPage() {
   // Open Edit Modal
   const handleOpenEdit = (rm: RMItem) => {
     setEditingRM(rm)
+    let curDepots = rm.depotIds
+    if (!curDepots || curDepots.length === 0) {
+      curDepots = rm.id === "rm-2" ? ["dep-2", "dep-1"] : ["dep-1"]
+    }
+
     setFormData({
       code: rm.code,
       name: rm.name,
       phone: rm.phone,
       pin: rm.pin || "123456",
       email: rm.email || "",
-      areaId: rm.areaId,
+      regionalOfficeId: rm.regionalOfficeId || regionalOffices[0]?.id || "ro-1",
+      depotIds: curDepots,
     })
     setShowPinModal(false)
     setFormError("")
     setFormErrors({})
+  }
+
+  // Toggle depot in multi-select checkboxes
+  const handleToggleDepot = (depotId: string) => {
+    setFormData((prev) => {
+      const exists = prev.depotIds.includes(depotId)
+      let nextDepotIds: string[]
+      if (exists) {
+        // Prevent deselecting all depots; at least 1 must remain selected
+        if (prev.depotIds.length === 1) return prev
+        nextDepotIds = prev.depotIds.filter((id) => id !== depotId)
+      } else {
+        nextDepotIds = [...prev.depotIds, depotId]
+      }
+      return { ...prev, depotIds: nextDepotIds }
+    })
+    if (formErrors.depotIds) {
+      setFormErrors((prev) => ({ ...prev, depotIds: undefined }))
+    }
   }
 
   // Handle Save
@@ -138,7 +176,8 @@ export default function RegionalManagersPage() {
       phone?: string
       pin?: string
       email?: string
-      areaId?: string
+      regionalOfficeId?: string
+      depotIds?: string
     } = {}
 
     if (!formData.code.trim()) {
@@ -153,8 +192,11 @@ export default function RegionalManagersPage() {
     if (!formData.pin || formData.pin.length !== 6 || !/^\d{6}$/.test(formData.pin)) {
       errors.pin = "PIN must be exactly 6 numeric digits."
     }
-    if (!formData.areaId) {
-      errors.areaId = "This field is required."
+    if (!formData.regionalOfficeId) {
+      errors.regionalOfficeId = "Regional Office is required."
+    }
+    if (!formData.depotIds || formData.depotIds.length === 0) {
+      errors.depotIds = "At least one connected Depot must be selected."
     }
 
     if (
@@ -169,8 +211,12 @@ export default function RegionalManagersPage() {
       return
     }
 
-    const assignedArea = areas.find((a) => a.id === formData.areaId)
-    const areaName = assignedArea ? assignedArea.name : "Unassigned"
+    const assignedRO = regionalOffices.find((r) => r.id === formData.regionalOfficeId)
+    const roName = assignedRO ? assignedRO.name : "Bogura Regional Office"
+    const depotNames = formData.depotIds.map((dId) => {
+      const d = depots.find((x) => x.id === dId)
+      return d ? d.name : dId
+    })
 
     if (editingRM) {
       updateRM(editingRM.id, {
@@ -179,26 +225,40 @@ export default function RegionalManagersPage() {
         phone: formData.phone.trim(),
         pin: formData.pin.trim(),
         email: formData.email.trim(),
-        areaId: formData.areaId,
-        areaName,
+        regionalOfficeId: formData.regionalOfficeId,
+        regionalOfficeName: roName,
+        depotIds: formData.depotIds,
+        depotNames,
       })
       setEditingRM(null)
       showToast("Regional Manager updated successfully.")
     } else {
       addRM({
-        code: formData.code.trim().toUpperCase() || `RM-${String(rms.length + 1).padStart(3, "0")}`,
+        code: formData.code.trim().toUpperCase(),
         name: formData.name.trim(),
         phone: formData.phone.trim(),
-        pin: formData.pin.trim() || "123456",
+        pin: formData.pin.trim(),
         email: formData.email.trim(),
-        areaId: formData.areaId,
-        areaName,
+        regionalOfficeId: formData.regionalOfficeId,
+        regionalOfficeName: roName,
+        depotIds: formData.depotIds,
+        depotNames,
       })
       setIsCreateOpen(false)
-      showToast("New Regional Manager added successfully with 6-digit login PIN.")
+      showToast("New Regional Manager created with 6-digit login PIN.")
     }
-    setFormErrors({})
+
+    setFormData({
+      code: "",
+      name: "",
+      phone: "",
+      pin: "123456",
+      email: "",
+      regionalOfficeId: regionalOffices[0]?.id || "ro-1",
+      depotIds: [depots[0]?.id || "dep-1"],
+    })
     setFormError("")
+    setFormErrors({})
   }
 
   // Handle Delete
@@ -223,10 +283,10 @@ export default function RegionalManagersPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Regional Managers
+            Regional Managers (RM)
           </h2>
           <p className="text-xs text-muted-foreground">
-            Manage regional managers and their assigned areas.
+            Total RMs: <span className="font-semibold text-foreground">{rms.length}</span> &bull; 1 RM per Regional Office
           </p>
         </div>
 
@@ -238,37 +298,21 @@ export default function RegionalManagersPage() {
           className="cursor-pointer gap-1.5 font-medium shadow-xs"
         >
           <Plus className="size-4" />
-          <span>Add RM</span>
+          <span>Add Regional Manager</span>
         </Button>
       </div>
 
-      {/* Main Table Card */}
+      {/* Main Table Card with Search & Regional Office Filter */}
       <Card className="border-border/80 bg-card shadow-xs">
         <CardHeader className="border-b border-border/70 p-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <CardTitle className="text-sm font-semibold text-foreground">
               Regional Managers ({filteredRMs.length})
             </CardTitle>
 
             {/* Filter and Search Controls */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              {/* Area Filter */}
-              <div className="flex items-center gap-1.5">
-                <Filter className="size-3.5 text-muted-foreground" />
-                <select
-                  aria-label="Filter by Area"
-                  value={selectedAreaFilter}
-                  onChange={(e) => setSelectedAreaFilter(e.target.value)}
-                  className="h-8 rounded border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-                >
-                  <option value="all">All Areas</option>
-                  {areas.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+
 
               {/* Search Bar */}
               <div className="relative w-full sm:w-64">
@@ -300,13 +344,13 @@ export default function RegionalManagersPage() {
                     RM Name
                   </th>
                   <th scope="col" className="px-4 py-3">
-                    Phone
+                    Regional Office
                   </th>
                   <th scope="col" className="px-4 py-3">
-                    Email
+                    Connected Depot(s)
                   </th>
                   <th scope="col" className="px-4 py-3">
-                    Assigned Area
+                    Phone & Email
                   </th>
                   <th scope="col" className="w-40 px-4 py-3 text-right">
                     Actions
@@ -315,88 +359,125 @@ export default function RegionalManagersPage() {
               </thead>
               <tbody className="divide-y divide-border/60">
                 {filteredRMs.length > 0 ? (
-                  filteredRMs.map((rm, index) => (
-                    <tr
-                      key={rm.id}
-                      className="transition-colors hover:bg-muted/30"
-                    >
-                      {/* Serial */}
-                      <td className="px-4 py-3 text-center font-medium text-muted-foreground">
-                        {index + 1}
-                      </td>
+                  filteredRMs.map((rm, index) => {
+                    const ro = regionalOffices.find((r) => r.id === rm.regionalOfficeId)
+                    const roName = ro ? ro.name : rm.regionalOfficeName || "Bogura Regional Office"
+                    const connectedDepots = (rm.depotIds || ["dep-1"]).map((dId) => {
+                      const d = depots.find((x) => x.id === dId)
+                      return d ? d.name : dId
+                    })
 
-                      {/* RM Code */}
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/5 px-2 py-0.5 font-mono text-[11px] font-semibold text-primary">
-                          <UserRound className="size-3 text-primary" />
-                          {rm.code}
-                        </span>
-                      </td>
+                    return (
+                      <tr
+                        key={rm.id}
+                        className="transition-colors hover:bg-muted/30"
+                      >
+                        {/* Serial */}
+                        <td className="px-4 py-3 text-center font-medium text-muted-foreground">
+                          {index + 1}
+                        </td>
 
-                      {/* RM Name */}
-                      <td className="px-4 py-3 font-semibold text-foreground">
-                        <Link
-                          href={`/rms/${rm.id}`}
-                          className="transition-colors hover:text-primary hover:underline"
-                        >
-                          {rm.name}
-                        </Link>
-                      </td>
+                        {/* RM Code */}
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/20 bg-primary/5 px-2 py-0.5 font-mono text-[11px] font-semibold text-primary">
+                            <UserRound className="size-3 text-primary" />
+                            {rm.code}
+                          </span>
+                        </td>
 
-                      {/* Phone */}
-                      <td className="px-4 py-3 text-muted-foreground">
-                        <div className="flex items-center gap-1.5 font-mono text-[11px]">
-                          <Phone className="size-3 text-muted-foreground" />
-                          <span>{rm.phone}</span>
-                        </div>
-                      </td>
-
-                      {/* Email */}
-                      <td className="px-4 py-3 text-muted-foreground">
-                        <div className="flex items-center gap-1.5 text-[11px]">
-                          <Mail className="size-3 text-muted-foreground" />
-                          <span>{rm.email}</span>
-                        </div>
-                      </td>
-
-                      {/* Assigned Area */}
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-foreground">
-                          <MapPin className="size-3 text-muted-foreground" />
-                          {rm.areaName}
-                        </span>
-                      </td>
-
-                      {/* Actions */}
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {/* Edit */}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => handleOpenEdit(rm)}
-                            aria-label={`Edit ${rm.name}`}
-                            className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                        {/* RM Name */}
+                        <td className="px-4 py-3 font-semibold text-foreground">
+                          <Link
+                            href={`/rms/${rm.id}`}
+                            className="transition-colors hover:text-primary hover:underline"
                           >
-                            <Pencil className="size-3.5" />
-                          </Button>
+                            {rm.name}
+                          </Link>
+                        </td>
 
-                          {/* Delete */}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => setDeletingRM(rm)}
-                            aria-label={`Delete ${rm.name}`}
-                            className="cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        {/* Regional Office */}
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1.5 text-xs text-foreground font-medium">
+                            <Building className="size-3.5 text-primary" />
+                            <span>{roName}</span>
+                          </span>
+                        </td>
+
+                        {/* Connected Depots */}
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1">
+                            {connectedDepots.map((dName, i) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center gap-1 rounded-sm border border-primary/20 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-foreground"
+                              >
+                                <Building2 className="size-3 text-primary" />
+                                <span>{dName}</span>
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+
+                        {/* Phone & Email */}
+                        <td className="px-4 py-3 text-muted-foreground">
+                          <div className="flex flex-col gap-0.5 text-[11px]">
+                            <span className="flex items-center gap-1 font-mono text-foreground">
+                              <Phone className="size-3 text-muted-foreground" />
+                              {rm.phone}
+                            </span>
+                            {rm.email && (
+                              <span className="flex items-center gap-1 text-muted-foreground">
+                                <Mail className="size-3 text-muted-foreground" />
+                                {rm.email}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {/* View Profile Link */}
+                            <Link href={`/rms/${rm.id}`}>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                aria-label={`View ${rm.name}`}
+                                className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                              >
+                                <Eye className="size-3.5" />
+                              </Button>
+                            </Link>
+
+                            {/* Edit */}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => handleOpenEdit(rm)}
+                              aria-label={`Edit ${rm.name}`}
+                              className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                            >
+                              <Pencil className="size-3.5" />
+                            </Button>
+
+                            {/* Delete */}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => setDeletingRM(rm)}
+                              aria-label={`Delete ${rm.name}`}
+                              className="cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
                 ) : (
                   <tr>
                     <td
@@ -433,7 +514,7 @@ export default function RegionalManagersPage() {
           />
 
           {/* Modal Container */}
-          <div className="relative z-10 w-full max-w-md rounded-md border border-border bg-card p-6 shadow-xl">
+          <div className="relative z-10 w-full max-w-md rounded-md border border-border bg-card p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border/60 pb-3">
               <h3 id="rm-modal-title" className="text-base font-semibold text-foreground">
@@ -455,7 +536,7 @@ export default function RegionalManagersPage() {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSave} noValidate className="mt-4 space-y-3.5">
+            <form onSubmit={handleSave} noValidate className="mt-4 space-y-4">
               {formError && (
                 <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
                   {formError}
@@ -477,16 +558,17 @@ export default function RegionalManagersPage() {
                   }}
                   placeholder="e.g. RM-001"
                   className={`text-xs font-mono uppercase ${formErrors.code ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  autoFocus
                 />
                 {formErrors.code && (
                   <p className="text-[11px] text-destructive">{formErrors.code}</p>
                 )}
               </div>
 
-              {/* RM Name */}
+              {/* Full Name */}
               <div className="space-y-1.5">
                 <Label htmlFor="rmName" className="text-xs font-medium text-foreground">
-                  RM Name
+                  Full Name
                 </Label>
                 <Input
                   id="rmName"
@@ -498,44 +580,48 @@ export default function RegionalManagersPage() {
                   }}
                   placeholder="e.g. Md. Rahim"
                   className={`text-xs ${formErrors.name ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                  autoFocus
                 />
                 {formErrors.name && (
                   <p className="text-[11px] text-destructive">{formErrors.name}</p>
                 )}
               </div>
 
-              {/* Phone */}
-              <div className="space-y-1.5">
-                <Label htmlFor="rmPhone" className="text-xs font-medium text-foreground">
-                  Phone Number
-                </Label>
-                <Input
-                  id="rmPhone"
-                  name="rmPhone"
-                  value={formData.phone}
-                  onChange={(e) => {
-                    setFormData((prev) => ({ ...prev, phone: e.target.value }))
-                    if (formErrors.phone) setFormErrors((prev) => ({ ...prev, phone: undefined }))
-                  }}
-                  placeholder="e.g. 01712-111222"
-                  className={`text-xs font-mono ${formErrors.phone ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                />
-                {formErrors.phone && (
-                  <p className="text-[11px] text-destructive">{formErrors.phone}</p>
-                )}
-              </div>
-
-              {/* Login PIN (6-Digit) */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="rmPin" className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                    <KeyRound className="size-3.5 text-primary" />
-                    <span>6-Digit Login PIN</span>
+              {/* Phone & PIN Row */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Phone */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="rmPhone" className="text-xs font-medium text-foreground">
+                    Phone
                   </Label>
-                  <span className="text-[10px] text-muted-foreground">Default: 123456</span>
+                  <Input
+                    id="rmPhone"
+                    name="rmPhone"
+                    value={formData.phone}
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, phone: e.target.value }))
+                      if (formErrors.phone) setFormErrors((prev) => ({ ...prev, phone: undefined }))
+                    }}
+                    placeholder="01712-111222"
+                    className={`text-xs font-mono ${formErrors.phone ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                  />
+                  {formErrors.phone && (
+                    <p className="text-[11px] text-destructive">{formErrors.phone}</p>
+                  )}
                 </div>
-                <div className="relative">
+
+                {/* 6-digit Login PIN */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="rmPin" className="text-xs font-medium text-foreground flex items-center justify-between">
+                    <span>6-digit PIN</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowPinModal((v) => !v)}
+                      className="text-[10px] text-primary hover:underline cursor-pointer flex items-center gap-0.5"
+                    >
+                      {showPinModal ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                      <span>{showPinModal ? "Hide" : "Show"}</span>
+                    </button>
+                  </Label>
                   <Input
                     id="rmPin"
                     name="rmPin"
@@ -543,31 +629,17 @@ export default function RegionalManagersPage() {
                     maxLength={6}
                     value={formData.pin}
                     onChange={(e) => {
-                      const numeric = e.target.value.replace(/\D/g, "").slice(0, 6)
-                      setFormData((prev) => ({ ...prev, pin: numeric }))
+                      const val = e.target.value.replace(/\D/g, "").slice(0, 6)
+                      setFormData((prev) => ({ ...prev, pin: val }))
                       if (formErrors.pin) setFormErrors((prev) => ({ ...prev, pin: undefined }))
                     }}
-                    placeholder="e.g. 123456"
-                    className={`text-xs font-mono tracking-wider pr-9 ${formErrors.pin ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                    placeholder="123456"
+                    className={`text-xs font-mono tracking-wider ${formErrors.pin ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={() => setShowPinModal(!showPinModal)}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                    aria-label={showPinModal ? "Hide PIN" : "Show PIN"}
-                  >
-                    {showPinModal ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                  </Button>
+                  {formErrors.pin && (
+                    <p className="text-[11px] text-destructive">{formErrors.pin}</p>
+                  )}
                 </div>
-                {formErrors.pin ? (
-                  <p className="text-[11px] text-destructive">{formErrors.pin}</p>
-                ) : (
-                  <p className="text-[10px] text-muted-foreground">
-                    Regional Manager will use this 6-digit PIN and Phone Number to log into the field portal.
-                  </p>
-                )}
               </div>
 
               {/* Email */}
@@ -592,28 +664,81 @@ export default function RegionalManagersPage() {
                 )}
               </div>
 
-              {/* Assigned Area */}
+              {/* Regional Office Selection (Exactly ONE) */}
               <div className="space-y-1.5">
-                <Label htmlFor="rmArea" className="text-xs font-medium text-foreground">
-                  Assigned Area
+                <Label htmlFor="rmROSelect" className="text-xs font-medium text-foreground">
+                  Regional Office
                 </Label>
                 <select
-                  id="rmArea"
-                  value={formData.areaId}
+                  id="rmROSelect"
+                  value={formData.regionalOfficeId}
                   onChange={(e) => {
-                    setFormData((prev) => ({ ...prev, areaId: e.target.value }))
-                    if (formErrors.areaId) setFormErrors((prev) => ({ ...prev, areaId: undefined }))
+                    setFormData((prev) => ({ ...prev, regionalOfficeId: e.target.value }))
+                    if (formErrors.regionalOfficeId) {
+                      setFormErrors((prev) => ({ ...prev, regionalOfficeId: undefined }))
+                    }
                   }}
-                  className={`h-8 w-full rounded border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring ${formErrors.areaId ? "border-destructive focus:ring-destructive" : "border-input"}`}
+                  className={`h-8 w-full rounded border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring ${formErrors.regionalOfficeId ? "border-destructive focus:ring-destructive" : "border-input"}`}
                 >
-                  {areas.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({a.code})
-                    </option>
-                  ))}
+                  {regionalOffices.map((ro) => {
+                    const occupyingRM = rms.find((r) => r.regionalOfficeId === ro.id && (!editingRM || r.id !== editingRM.id))
+                    return (
+                      <option key={ro.id} value={ro.id}>
+                        {ro.name} ({ro.code}){occupyingRM ? ` — Assigned to ${occupyingRM.name}` : ""}
+                      </option>
+                    )
+                  })}
                 </select>
-                {formErrors.areaId && (
-                  <p className="text-[11px] text-destructive">{formErrors.areaId}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  One RM belongs to exactly one Regional Office.
+                </p>
+                {formErrors.regionalOfficeId && (
+                  <p className="text-[11px] text-destructive">{formErrors.regionalOfficeId}</p>
+                )}
+              </div>
+
+              {/* Connected Depots Multi-Select (Multiple Depots Allowed) */}
+              <div className="space-y-2 rounded-md border border-border/80 bg-muted/20 p-3">
+                <Label className="text-xs font-medium text-foreground block">
+                  Connected Depot(s) (Select one or more)
+                </Label>
+                <p className="text-[10px] text-muted-foreground">
+                  An RM can be connected to multiple Depots (e.g. Rangpur Depot and Bogura Depot).
+                </p>
+
+                <div className="space-y-2 pt-1">
+                  {depots.map((depot) => {
+                    const isChecked = formData.depotIds.includes(depot.id)
+                    return (
+                      <label
+                        key={depot.id}
+                        className={`flex items-center gap-2.5 rounded border p-2 text-xs transition-colors cursor-pointer ${
+                          isChecked
+                            ? "border-primary/40 bg-primary/5 text-foreground font-semibold"
+                            : "border-border/60 bg-card text-muted-foreground hover:bg-muted/40"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => handleToggleDepot(depot.id)}
+                          className="size-4 rounded border-border text-primary focus:ring-primary accent-primary cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span>{depot.name}</span>
+                            <span className="font-mono text-[10px] text-primary">{depot.code}</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground font-normal block">
+                            {depot.location}
+                          </span>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+                {formErrors.depotIds && (
+                  <p className="text-[11px] text-destructive">{formErrors.depotIds}</p>
                 )}
               </div>
 
@@ -627,16 +752,16 @@ export default function RegionalManagersPage() {
                     setIsCreateOpen(false)
                     setEditingRM(null)
                   }}
-                  className="cursor-pointer"
+                  className="cursor-pointer text-xs"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   size="sm"
-                  className="cursor-pointer font-medium"
+                  className="cursor-pointer font-medium text-xs"
                 >
-                  {editingRM ? "Save Changes" : "Save RM"}
+                  {editingRM ? "Save Changes" : "Save Regional Manager"}
                 </Button>
               </div>
             </form>
@@ -667,21 +792,17 @@ export default function RegionalManagersPage() {
                 <AlertTriangle className="size-5" />
               </div>
               <div className="space-y-1">
-                <h3
-                  id="delete-rm-title"
-                  className="text-sm font-semibold text-foreground"
-                >
+                <h3 id="delete-rm-title" className="text-sm font-semibold text-foreground">
                   Confirm Delete
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Are you sure you want to delete this Regional Manager?
+                  Are you sure you want to delete this Regional Manager? This will affect AM and MPO hierarchy.
                 </p>
                 <div className="mt-2 rounded border border-border/80 bg-muted/40 p-2 text-xs">
                   <span className="font-mono font-semibold text-primary">
                     {deletingRM.code}
                   </span>{" "}
-                  - <span className="font-medium text-foreground">{deletingRM.name}</span> (
-                  {deletingRM.areaName})
+                  - <span className="font-medium text-foreground">{deletingRM.name}</span>
                 </div>
               </div>
             </div>
@@ -693,7 +814,7 @@ export default function RegionalManagersPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setDeletingRM(null)}
-                className="cursor-pointer"
+                className="cursor-pointer text-xs"
               >
                 Cancel
               </Button>
@@ -702,7 +823,7 @@ export default function RegionalManagersPage() {
                 variant="destructive"
                 size="sm"
                 onClick={handleConfirmDelete}
-                className="cursor-pointer font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="cursor-pointer font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs"
               >
                 Delete
               </Button>

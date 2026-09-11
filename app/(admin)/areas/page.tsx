@@ -7,7 +7,9 @@ import {
   Pencil,
   Trash2,
   MapPin,
+  Building,
   Building2,
+  UsersRound,
   Filter,
   X,
   AlertTriangle,
@@ -18,15 +20,23 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { initialAreasWithDepot, initialDepots, type AreaItem, type Depot } from "@/lib/mock-data"
+import { useAppState } from "@/lib/store"
+import { type AreaItem } from "@/lib/mock-data"
 
 export default function AreasPage() {
-  const [areas, setAreas] = React.useState<AreaItem[]>(initialAreasWithDepot)
-  const [depots] = React.useState<Depot[]>(initialDepots)
+  const {
+    areas,
+    regionalOffices,
+    depots,
+    ams,
+    addArea,
+    updateArea,
+    deleteArea,
+  } = useAppState()
 
   // Filters
   const [searchQuery, setSearchQuery] = React.useState("")
-  const [selectedDepotFilter, setSelectedDepotFilter] = React.useState("all")
+  const [selectedROFilter, setSelectedROFilter] = React.useState("all")
 
   // Modal States
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
@@ -37,7 +47,7 @@ export default function AreasPage() {
   const [formData, setFormData] = React.useState({
     code: "",
     name: "",
-    depotId: depots[0]?.id || "dep-1",
+    regionalOfficeId: regionalOffices[0]?.id || "ro-1",
   })
   const [formError, setFormError] = React.useState("")
   const [toastMessage, setToastMessage] = React.useState<string | null>(null)
@@ -45,17 +55,19 @@ export default function AreasPage() {
   // Filtered areas
   const filteredAreas = React.useMemo(() => {
     return areas.filter((a) => {
+      const q = searchQuery.toLowerCase().trim()
       const matchesSearch =
-        !searchQuery.trim() ||
-        a.code.toLowerCase().includes(searchQuery.toLowerCase().trim()) ||
-        a.name.toLowerCase().includes(searchQuery.toLowerCase().trim())
+        !q ||
+        a.code.toLowerCase().includes(q) ||
+        a.name.toLowerCase().includes(q) ||
+        (a.regionalOfficeName && a.regionalOfficeName.toLowerCase().includes(q))
 
-      const matchesDepot =
-        selectedDepotFilter === "all" || a.depotId === selectedDepotFilter
+      const matchesRO =
+        selectedROFilter === "all" || a.regionalOfficeId === selectedROFilter
 
-      return matchesSearch && matchesDepot
+      return matchesSearch && matchesRO
     })
-  }, [areas, searchQuery, selectedDepotFilter])
+  }, [areas, searchQuery, selectedROFilter])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -67,15 +79,16 @@ export default function AreasPage() {
   const [formErrors, setFormErrors] = React.useState<{
     code?: string
     name?: string
-    depotId?: string
+    regionalOfficeId?: string
   }>({})
 
   // Open Create Modal
   const handleOpenCreate = () => {
+    const nextNum = areas.length + 1
     setFormData({
-      code: "",
+      code: `AREA-${String(nextNum).padStart(3, "0")}`,
       name: "",
-      depotId: depots[0]?.id || "dep-1",
+      regionalOfficeId: regionalOffices[0]?.id || "ro-1",
     })
     setFormError("")
     setFormErrors({})
@@ -88,7 +101,7 @@ export default function AreasPage() {
     setFormData({
       code: area.code,
       name: area.name,
-      depotId: area.depotId || depots[0]?.id || "dep-1",
+      regionalOfficeId: area.regionalOfficeId || regionalOffices[0]?.id || "ro-1",
     })
     setFormError("")
     setFormErrors({})
@@ -97,15 +110,15 @@ export default function AreasPage() {
   // Handle Save (Create or Edit)
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
-    const errors: { code?: string; name?: string; depotId?: string } = {}
+    const errors: { code?: string; name?: string; regionalOfficeId?: string } = {}
     if (!formData.code.trim()) {
       errors.code = "This field is required."
     }
     if (!formData.name.trim()) {
       errors.name = "This field is required."
     }
-    if (!formData.depotId) {
-      errors.depotId = "This field is required."
+    if (!formData.regionalOfficeId) {
+      errors.regionalOfficeId = "Regional Office selection is required."
     }
 
     if (Object.keys(errors).length > 0) {
@@ -113,39 +126,37 @@ export default function AreasPage() {
       return
     }
 
-    const assignedDepot = depots.find((d) => d.id === formData.depotId)
+    const assignedRO = regionalOffices.find((ro) => ro.id === formData.regionalOfficeId)
+    const roName = assignedRO?.name || ""
+    const depotId = assignedRO?.depotId || depots[0]?.id || "dep-1"
+    const depotName = assignedRO?.depotName || depots[0]?.name || ""
 
     if (editingArea) {
       // Update existing
-      setAreas((prev) =>
-        prev.map((item) =>
-          item.id === editingArea.id
-            ? {
-                ...item,
-                code: formData.code.trim().toUpperCase(),
-                name: formData.name.trim(),
-                depotId: formData.depotId,
-                depotName: assignedDepot?.name || "",
-              }
-            : item
-        )
-      )
+      updateArea(editingArea.id, {
+        code: formData.code.trim().toUpperCase(),
+        name: formData.name.trim(),
+        regionalOfficeId: formData.regionalOfficeId,
+        regionalOfficeName: roName,
+        depotId,
+        depotName,
+      })
       setEditingArea(null)
       showToast("Area updated successfully.")
     } else {
       // Create new
-      const newArea: AreaItem = {
-        id: Date.now().toString(),
+      addArea({
         code: formData.code.trim().toUpperCase(),
         name: formData.name.trim(),
-        depotId: formData.depotId,
-        depotName: assignedDepot?.name || "",
-      }
-      setAreas((prev) => [newArea, ...prev])
+        regionalOfficeId: formData.regionalOfficeId,
+        regionalOfficeName: roName,
+        depotId,
+        depotName,
+      })
       setIsCreateOpen(false)
       showToast("New area created successfully.")
     }
-    setFormData({ code: "", name: "", depotId: depots[0]?.id || "dep-1" })
+    setFormData({ code: "", name: "", regionalOfficeId: regionalOffices[0]?.id || "ro-1" })
     setFormError("")
     setFormErrors({})
   }
@@ -153,7 +164,7 @@ export default function AreasPage() {
   // Handle Delete
   const handleConfirmDelete = () => {
     if (!deletingArea) return
-    setAreas((prev) => prev.filter((item) => item.id !== deletingArea.id))
+    deleteArea(deletingArea.id)
     setDeletingArea(null)
     showToast("Area deleted successfully.")
   }
@@ -175,7 +186,7 @@ export default function AreasPage() {
             Areas
           </h2>
           <p className="text-xs text-muted-foreground">
-            Total Areas: <span className="font-semibold text-foreground">{areas.length}</span>
+            Total Areas: <span className="font-semibold text-foreground">{areas.length}</span> across Regional Offices
           </p>
         </div>
 
@@ -191,7 +202,7 @@ export default function AreasPage() {
         </Button>
       </div>
 
-      {/* Main Table Card with Search & Depot Filter */}
+      {/* Main Table Card with Search & Regional Office Filter */}
       <Card className="border-border/80 bg-card shadow-xs">
         <CardHeader className="border-b border-border/70 p-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -199,20 +210,20 @@ export default function AreasPage() {
               Areas ({filteredAreas.length})
             </CardTitle>
 
-            {/* Filter Controls: Depot Select & Search Bar */}
+            {/* Filter Controls: Regional Office Select & Search Bar */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              {/* Depot Filter Dropdown */}
+              {/* Regional Office Filter Dropdown */}
               <div className="flex items-center gap-1.5">
                 <Filter className="size-3.5 text-muted-foreground" />
                 <select
-                  value={selectedDepotFilter}
-                  onChange={(e) => setSelectedDepotFilter(e.target.value)}
+                  value={selectedROFilter}
+                  onChange={(e) => setSelectedROFilter(e.target.value)}
                   className="h-8 rounded-none border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
                 >
-                  <option value="all">All Depots</option>
-                  {depots.map((dep) => (
-                    <option key={dep.id} value={dep.id}>
-                      {dep.name}
+                  <option value="all">All Regional Offices</option>
+                  {regionalOffices.map((ro) => (
+                    <option key={ro.id} value={ro.id}>
+                      {ro.name}
                     </option>
                   ))}
                 </select>
@@ -248,7 +259,13 @@ export default function AreasPage() {
                     Area Name
                   </th>
                   <th scope="col" className="px-4 py-3">
-                    Associated Depot
+                    Regional Office
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Primary Depot
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Assigned AM
                   </th>
                   <th scope="col" className="w-32 px-4 py-3 text-right">
                     Actions
@@ -258,8 +275,10 @@ export default function AreasPage() {
               <tbody className="divide-y divide-border/60">
                 {filteredAreas.length > 0 ? (
                   filteredAreas.map((area, index) => {
-                    const depotObj = depots.find((d) => d.id === area.depotId)
-                    const depotDisplayName = depotObj ? depotObj.name : area.depotName || "—"
+                    const ro = regionalOffices.find((r) => r.id === area.regionalOfficeId)
+                    const roDisplayName = ro ? ro.name : area.regionalOfficeName || "—"
+                    const depotDisplayName = ro?.depotName || area.depotName || "Bogura Depot"
+                    const assignedAM = ams.find((a) => a.areaId === area.id)
 
                     return (
                       <tr
@@ -284,12 +303,32 @@ export default function AreasPage() {
                           {area.name}
                         </td>
 
+                        {/* Regional Office */}
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1.5 text-xs text-foreground font-medium">
+                            <Building className="size-3.5 text-primary" />
+                            <span>{roDisplayName}</span>
+                          </span>
+                        </td>
+
                         {/* Associated Depot */}
                         <td className="px-4 py-3">
                           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                             <Building2 className="size-3.5 text-muted-foreground/80" />
                             <span>{depotDisplayName}</span>
                           </span>
+                        </td>
+
+                        {/* Assigned AM */}
+                        <td className="px-4 py-3">
+                          {assignedAM ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-foreground">
+                              <UsersRound className="size-3 text-muted-foreground" />
+                              <span className="font-medium">{assignedAM.name}</span>
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground">Unassigned</span>
+                          )}
                         </td>
 
                         {/* Actions: Edit / Delete */}
@@ -326,7 +365,7 @@ export default function AreasPage() {
                 ) : (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={7}
                       className="px-4 py-8 text-center text-xs text-muted-foreground"
                     >
                       No areas found.
@@ -404,7 +443,7 @@ export default function AreasPage() {
                     setFormData((prev) => ({ ...prev, code: e.target.value }))
                     if (formErrors.code) setFormErrors((prev) => ({ ...prev, code: undefined }))
                   }}
-                  placeholder="e.g. DHA-01"
+                  placeholder="e.g. AREA-BOG-01"
                   className={`text-xs font-mono uppercase ${formErrors.code ? "border-destructive focus-visible:ring-destructive" : ""}`}
                   autoFocus
                 />
@@ -426,7 +465,7 @@ export default function AreasPage() {
                     setFormData((prev) => ({ ...prev, name: e.target.value }))
                     if (formErrors.name) setFormErrors((prev) => ({ ...prev, name: undefined }))
                   }}
-                  placeholder="e.g. Dhaka North"
+                  placeholder="e.g. Bogura"
                   className={`text-xs ${formErrors.name ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 />
                 {formErrors.name && (
@@ -434,28 +473,28 @@ export default function AreasPage() {
                 )}
               </div>
 
-              {/* Associated Depot */}
+              {/* Regional Office Association (Each Area belongs to exactly ONE Regional Office) */}
               <div className="space-y-1.5">
-                <Label htmlFor="depotSelect" className="text-xs font-medium text-foreground">
-                  Associated Depot
+                <Label htmlFor="roSelect" className="text-xs font-medium text-foreground">
+                  Regional Office
                 </Label>
                 <select
-                  id="depotSelect"
-                  value={formData.depotId}
+                  id="roSelect"
+                  value={formData.regionalOfficeId}
                   onChange={(e) => {
-                    setFormData((prev) => ({ ...prev, depotId: e.target.value }))
-                    if (formErrors.depotId) setFormErrors((prev) => ({ ...prev, depotId: undefined }))
+                    setFormData((prev) => ({ ...prev, regionalOfficeId: e.target.value }))
+                    if (formErrors.regionalOfficeId) setFormErrors((prev) => ({ ...prev, regionalOfficeId: undefined }))
                   }}
-                  className={`h-8 w-full rounded border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring ${formErrors.depotId ? "border-destructive focus:ring-destructive" : "border-input"}`}
+                  className={`h-8 w-full rounded border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring ${formErrors.regionalOfficeId ? "border-destructive focus:ring-destructive" : "border-input"}`}
                 >
-                  {depots.map((dep) => (
-                    <option key={dep.id} value={dep.id}>
-                      {dep.name} ({dep.code})
+                  {regionalOffices.map((ro) => (
+                    <option key={ro.id} value={ro.id}>
+                      {ro.name} ({ro.code}) &bull; Primary Depot: {ro.depotName || "Bogura Depot"}
                     </option>
                   ))}
                 </select>
-                {formErrors.depotId && (
-                  <p className="text-[11px] text-destructive">{formErrors.depotId}</p>
+                {formErrors.regionalOfficeId && (
+                  <p className="text-[11px] text-destructive">{formErrors.regionalOfficeId}</p>
                 )}
               </div>
 
@@ -469,14 +508,14 @@ export default function AreasPage() {
                     setIsCreateOpen(false)
                     setEditingArea(null)
                   }}
-                  className="cursor-pointer"
+                  className="cursor-pointer text-xs"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   size="sm"
-                  className="cursor-pointer font-medium"
+                  className="cursor-pointer font-medium text-xs"
                 >
                   {editingArea ? "Save Changes" : "Save Area"}
                 </Button>
@@ -534,7 +573,7 @@ export default function AreasPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setDeletingArea(null)}
-                className="cursor-pointer"
+                className="cursor-pointer text-xs"
               >
                 Cancel
               </Button>
@@ -543,7 +582,7 @@ export default function AreasPage() {
                 variant="destructive"
                 size="sm"
                 onClick={handleConfirmDelete}
-                className="cursor-pointer font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="cursor-pointer font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs"
               >
                 Delete
               </Button>

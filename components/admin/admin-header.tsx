@@ -48,11 +48,11 @@ export function AdminHeader({ onOpenSidebar }: AdminHeaderProps) {
   const pageTitle = React.useMemo(() => {
     if (pathname === "/officer/rm/dashboard") return "Regional Manager Dashboard"
     if (pathname === "/officer/am/dashboard") return "Area Manager Dashboard"
-    if (pathname === "/officer/dashboard") return "Sales Officer Dashboard"
+    if (pathname === "/officer/dashboard") return "MPO Dashboard"
     if (pathname === "/dashboard") {
       if (currentRole === "rm") return "Regional Manager Dashboard"
       if (currentRole === "am") return "Area Manager Dashboard"
-      if (currentRole === "officer") return "Sales Officer Dashboard"
+      if (currentRole === "officer") return "MPO Dashboard"
       return "Executive Overview Dashboard"
     }
 
@@ -68,7 +68,7 @@ export function AdminHeader({ onOpenSidebar }: AdminHeaderProps) {
     if (currentItem) return currentItem.title
 
     if (pathname.includes("/ams")) return "Area Managers (AM)"
-    if (pathname.includes("/officers")) return "Sales Officers"
+    if (pathname.includes("/officers")) return "MPOs"
     if (pathname.includes("/customers")) return "Customers"
     if (pathname.includes("/orders")) return "Orders"
     if (pathname.includes("/stock-management") || pathname.includes("/stock")) return "Stock Management"
