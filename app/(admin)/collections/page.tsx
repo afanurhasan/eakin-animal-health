@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import Link from "next/link"
 import {
   Banknote,
@@ -353,9 +354,6 @@ export default function CollectionsPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-slate-900">Collections</h1>
-              <p className="text-sm text-slate-500">
-                Record customer payments and manage FIFO invoice debt settlements.
-              </p>
             </div>
           </div>
         </div>
@@ -913,7 +911,7 @@ export default function CollectionsPage() {
       {/* ========================================================================= */}
       {selectedReceipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="relative w-full max-w-2xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8">
+          <div className="relative w-full max-w-3xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8">
             {/* Modal Bar */}
             <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4">
               <div className="flex items-center gap-2">
@@ -943,66 +941,47 @@ export default function CollectionsPage() {
             {/* Receipt Body */}
             <div className="p-6 space-y-6">
               {/* Receipt Top Header */}
-              <div className="flex items-start justify-between border-b border-slate-200 pb-4">
-                <div>
-                  <div className="text-xl font-black tracking-tight text-emerald-800">
-                    EAKIN ANIMAL HEALTH
+              <div className="flex items-center justify-between border-b border-slate-200 pb-4 gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center">
+                    <Image
+                      src="/logo.jpeg"
+                      alt="Eakin Animal Health Logo"
+                      width={160}
+                      height={45}
+                      className="h-10 w-auto object-contain"
+                      priority
+                    />
                   </div>
-                  <p className="text-xs font-semibold text-emerald-700 mt-0.5">
-                    Official Money Receipt
-                  </p>
+                  <div>
+                    <h1 className="text-base font-bold tracking-tight text-slate-900">
+                      Eakin Animal Health Ltd.
+                    </h1>
+                  </div>
                 </div>
                 <div className="text-right">
-                  <div className="inline-block rounded bg-emerald-50 px-2.5 py-1 text-xs font-mono font-bold text-emerald-800 border border-emerald-200">
-                    {selectedReceipt.code}
-                  </div>
-                  <div className="text-xs text-slate-500 mt-1">{selectedReceipt.date}</div>
+                  <div className="text-xs text-slate-500">{selectedReceipt.date}</div>
                 </div>
               </div>
 
               {/* Customer Details Box */}
-              <div className="rounded-lg bg-slate-50 border border-slate-200 p-4 text-xs space-y-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <span className="font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                      Received From (Customer):
-                    </span>
-                    <div className="font-bold text-slate-900 text-sm">
-                      {selectedReceipt.customerName}
-                    </div>
-                    <div className="text-slate-700 font-medium">{selectedReceipt.shopName}</div>
-                    <div className="text-slate-500 font-mono mt-0.5">
-                      Customer ID: {selectedReceipt.customerCode}
-                    </div>
-                    {receiptCustomer?.phone && (
-                      <div className="text-slate-500 mt-0.5">Phone: {receiptCustomer.phone}</div>
-                    )}
-                    {receiptCustomer?.address && (
-                      <div className="text-slate-500 mt-0.5">{receiptCustomer.address}</div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col justify-between">
-                    <div>
-                      <span className="font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                        Receipt Info:
-                      </span>
-                      <div className="text-slate-700">
-                        <span className="text-slate-500">Voucher No:</span>{" "}
-                        <strong className="font-mono">{selectedReceipt.code}</strong>
-                      </div>
-                      <div className="text-slate-700 mt-0.5">
-                        <span className="text-slate-500">Collection Date:</span> {selectedReceipt.date}
-                      </div>
-                      <div className="text-slate-700 mt-0.5">
-                        <span className="text-slate-500">Status:</span>{" "}
-                        <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.2 text-[11px] font-semibold text-emerald-800">
-                          <Check className="h-3 w-3" /> Settled
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+              <div className="rounded-lg bg-slate-50 border border-slate-200 p-4 text-xs">
+                <span className="font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                  Received From (Customer):
+                </span>
+                <div className="font-bold text-slate-900 text-sm">
+                  {selectedReceipt.customerName}
                 </div>
+                <div className="text-slate-700 font-medium">{selectedReceipt.shopName}</div>
+                <div className="text-slate-500 font-mono mt-0.5">
+                  Customer ID: {selectedReceipt.customerCode}
+                </div>
+                {receiptCustomer?.phone && (
+                  <div className="text-slate-500 mt-0.5">Phone: {receiptCustomer.phone}</div>
+                )}
+                {receiptCustomer?.address && (
+                  <div className="text-slate-500 mt-0.5">{receiptCustomer.address}</div>
+                )}
               </div>
 
               {/* Allocation Breakdown Table */}
@@ -1013,39 +992,39 @@ export default function CollectionsPage() {
                     {selectedReceipt.allocations.length} invoice(s) applied
                   </span>
                 </h4>
-                <div className="overflow-hidden rounded-lg border border-slate-200">
-                  <table className="w-full text-left text-xs">
+                <div className="overflow-x-auto rounded-lg border border-slate-200">
+                  <table className="w-full text-left text-xs min-w-[620px]">
                     <thead className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
                       <tr>
-                        <th className="py-2.5 px-3">Invoice ID</th>
-                        <th className="py-2.5 px-3">Invoice Date</th>
-                        <th className="py-2.5 px-3 text-right">Invoice Total</th>
-                        <th className="py-2.5 px-3 text-right">Prior Due</th>
-                        <th className="py-2.5 px-3 text-right font-bold text-emerald-800">
+                        <th className="py-2.5 px-3 whitespace-nowrap">Invoice ID</th>
+                        <th className="py-2.5 px-3 whitespace-nowrap">Invoice Date</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap">Invoice Total</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap">Prior Due</th>
+                        <th className="py-2.5 px-3 text-right font-bold text-emerald-800 whitespace-nowrap">
                           Amount Paid
                         </th>
-                        <th className="py-2.5 px-3 text-right">Remaining Due</th>
+                        <th className="py-2.5 px-3 text-right whitespace-nowrap">Remaining Due</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {selectedReceipt.allocations.map((alloc) => (
                         <tr key={alloc.orderId} className="hover:bg-slate-50">
-                          <td className="py-2.5 px-3 font-mono font-medium text-slate-800">
+                          <td className="py-2.5 px-3 font-mono font-medium text-slate-800 whitespace-nowrap">
                             {alloc.orderCode}
                           </td>
                           <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
                             {alloc.orderDate}
                           </td>
-                          <td className="py-2.5 px-3 text-right font-mono">
+                          <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">
                             ৳{alloc.originalGrandTotal.toLocaleString()}
                           </td>
-                          <td className="py-2.5 px-3 text-right font-mono text-slate-500">
+                          <td className="py-2.5 px-3 text-right font-mono text-slate-500 whitespace-nowrap">
                             ৳{alloc.previousDue.toLocaleString()}
                           </td>
-                          <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700">
+                          <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
                             ৳{alloc.allocatedAmount.toLocaleString()}
                           </td>
-                          <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-800">
+                          <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-800 whitespace-nowrap">
                             {alloc.remainingDue === 0 ? (
                               <span className="text-emerald-600 font-bold">Cleared (৳0)</span>
                             ) : (
@@ -1069,17 +1048,6 @@ export default function CollectionsPage() {
                 </span>
               </div>
 
-              {/* Official Signature Lines for Print */}
-              <div className="pt-6 border-t border-slate-200 grid grid-cols-2 gap-8 text-center text-xs text-slate-500">
-                <div>
-                  <div className="border-b border-slate-300 pb-8"></div>
-                  <p className="mt-1.5 font-medium text-slate-600">Customer Signature</p>
-                </div>
-                <div>
-                  <div className="border-b border-slate-300 pb-8"></div>
-                  <p className="mt-1.5 font-medium text-slate-600">Authorized Accounts Signature</p>
-                </div>
-              </div>
             </div>
 
             {/* Footer */}

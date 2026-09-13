@@ -74,8 +74,6 @@ type ReportType =
   | "collections"
   | "outstanding"
   | "returns"
-  | "orders"
-  | "stock"
 
 type DatePreset =
   | "all"
@@ -586,7 +584,7 @@ export default function ReportsPage() {
     let csvContent = ""
     let fileName = `eakin-${activeReport}-report-${new Date().toISOString().slice(0, 10)}.csv`
 
-    if (activeReport === "sales" || activeReport === "orders") {
+    if (activeReport === "sales") {
       const headers = [
         "Invoice Code",
         "Date",
@@ -618,23 +616,19 @@ export default function ReportsPage() {
       csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
     } else if (activeReport === "collections") {
       const headers = [
-        "Receipt Code",
         "Date",
         "Customer Name",
         "Customer Code",
         "Shop Name",
-        "Payment Method",
         "Amount (BDT)",
         "Allocated Order",
         "Recorded By",
       ]
       const rows = filteredCollections.map((c) => [
-        `"${c.code}"`,
         `"${c.date}"`,
         `"${c.customerName}"`,
         `"${c.customerCode}"`,
         `"${c.shopName}"`,
-        `"${c.paymentMethod || "Bank Transfer"}"`,
         c.amount,
         `"${c.allocations?.[0]?.orderCode || "Direct"}"`,
         `"${c.recordedBy || "Finance"}"`,
@@ -648,7 +642,6 @@ export default function ReportsPage() {
         "Phone",
         "Area",
         "MPO",
-        "Credit Limit (BDT)",
         "Outstanding Due (BDT)",
         "Total Orders",
         "Total Spent (BDT)",
@@ -660,7 +653,6 @@ export default function ReportsPage() {
         `"${c.phone}"`,
         `"${c.areaName}"`,
         `"${c.officerName}"`,
-        c.creditLimit || 0,
         c.outstandingBalance || 0,
         c.totalOrders || 0,
         c.totalSpent || 0,
@@ -668,7 +660,6 @@ export default function ReportsPage() {
       csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
     } else if (activeReport === "returns") {
       const headers = [
-        "Return Voucher",
         "Date",
         "Customer Name",
         "Restocked Depot",
@@ -677,37 +668,12 @@ export default function ReportsPage() {
         "Recorded By",
       ]
       const rows = filteredReturns.map((r) => [
-        `"${r.code}"`,
         `"${r.date}"`,
         `"${r.customerName}"`,
         `"${r.depotName}"`,
         r.totalReturnedQuantity,
         r.totalReturnAmount,
         `"${r.recordedBy}"`,
-      ])
-      csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
-    } else if (activeReport === "stock") {
-      const headers = [
-        "Product Name",
-        "Product Code",
-        "Pack Size",
-        "Depot",
-        "Available Stock",
-        "Min Threshold",
-        "Buy Price (BDT)",
-        "Sell Price (BDT)",
-        "Total Valuation (BDT)",
-      ]
-      const rows = filteredStockRows.map((r) => [
-        `"${r.item.productName}"`,
-        `"${r.item.productCode}"`,
-        `"${r.item.packSize}"`,
-        `"${r.depotName}"`,
-        r.item.quantity,
-        r.item.minThreshold,
-        r.product?.buyPrice || 0,
-        r.product?.sellPrice || r.product?.price || 0,
-        (r.product?.sellPrice || r.product?.price || 0) * r.item.quantity,
       ])
       csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n")
     }
@@ -1079,44 +1045,6 @@ export default function ReportsPage() {
             {filteredReturns.length}
           </span>
         </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setActiveReport("orders")
-            setCurrentPage(1)
-          }}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-t-lg transition-colors cursor-pointer border-b-2 ${
-            activeReport === "orders"
-              ? "border-primary text-primary bg-primary/5 font-bold"
-              : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"
-          }`}
-        >
-          <ShoppingCart className="size-4" />
-          <span>5. Order Pipeline Report</span>
-          <span className="rounded-full bg-muted px-1.5 py-0.2 text-[10px]">
-            {filteredOrders.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setActiveReport("stock")
-            setCurrentPage(1)
-          }}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-t-lg transition-colors cursor-pointer border-b-2 ${
-            activeReport === "stock"
-              ? "border-primary text-primary bg-primary/5 font-bold"
-              : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"
-          }`}
-        >
-          <Boxes className="size-4" />
-          <span>6. Stock Valuation Report</span>
-          <span className="rounded-full bg-muted px-1.5 py-0.2 text-[10px]">
-            {filteredStockRows.length}
-          </span>
-        </button>
       </div>
 
       {/* ==================================================== */}
@@ -1241,80 +1169,6 @@ export default function ReportsPage() {
             </span>
             <p className="mt-1 font-mono text-lg font-bold text-foreground">
               {filteredReturns.length} return slips
-            </p>
-          </div>
-        </div>
-      )}
-
-      {activeReport === "orders" && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-lg border border-border/80 bg-card p-3 shadow-2xs">
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Total Invoices Placed
-            </span>
-            <p className="mt-1 font-mono text-lg font-bold text-foreground">
-              {reportMetrics.totalOrdersCount}
-            </p>
-          </div>
-          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 shadow-2xs">
-            <span className="text-[11px] font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider">
-              Pending Orders
-            </span>
-            <p className="mt-1 font-mono text-lg font-bold text-amber-600 dark:text-amber-400">
-              {filteredOrders.filter((o) => o.status === "Pending").length}
-            </p>
-          </div>
-          <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 shadow-2xs">
-            <span className="text-[11px] font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
-              Approved Orders
-            </span>
-            <p className="mt-1 font-mono text-lg font-bold text-emerald-600 dark:text-emerald-400">
-              {filteredOrders.filter((o) => o.status === "Approved").length}
-            </p>
-          </div>
-          <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 shadow-2xs">
-            <span className="text-[11px] font-semibold text-rose-800 dark:text-rose-300 uppercase tracking-wider">
-              Cancelled Orders
-            </span>
-            <p className="mt-1 font-mono text-lg font-bold text-rose-600 dark:text-rose-400">
-              {filteredOrders.filter((o) => o.status === "Cancelled").length}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {activeReport === "stock" && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-lg border border-border/80 bg-card p-3 shadow-2xs">
-            <p className="text-[11px] font-medium text-muted-foreground">
-              Total Stock Quantity
-            </p>
-            <p className="mt-1 font-mono text-2xl font-bold text-foreground">
-              {reportMetrics.totalStockUnits.toLocaleString()}
-            </p>
-          </div>
-          <div className="rounded-lg border border-border/80 bg-card p-3 shadow-2xs">
-            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-              Stock Valuation (Buy Price)
-            </span>
-            <p className="mt-1 font-mono text-lg font-bold text-foreground">
-              ৳ {reportMetrics.totalBuyValuation.toLocaleString()}
-            </p>
-          </div>
-          <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 shadow-2xs">
-            <span className="text-[11px] font-semibold text-primary uppercase tracking-wider">
-              Stock Valuation (Sell Price)
-            </span>
-            <p className="mt-1 font-mono text-lg font-bold text-primary">
-              ৳ {reportMetrics.totalSellValuation.toLocaleString()}
-            </p>
-          </div>
-          <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 shadow-2xs">
-            <span className="text-[11px] font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider">
-              Low Stock Warnings
-            </span>
-            <p className="mt-1 font-mono text-lg font-bold text-amber-600 dark:text-amber-400">
-              {reportMetrics.lowStockAlerts} items
             </p>
           </div>
         </div>
@@ -1468,10 +1322,8 @@ export default function ReportsPage() {
                 <thead>
                   <tr className="border-b border-border/70 bg-muted/30 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                     <th className="px-3.5 py-2.5">Date</th>
-                    <th className="px-3 py-2.5">Receipt Code</th>
                     <th className="px-3 py-2.5">Customer</th>
                     <th className="px-3 py-2.5">Assigned Officer</th>
-                    <th className="px-3 py-2.5">Payment Method</th>
                     <th className="px-3 py-2.5">Allocated Invoice</th>
                     <th className="px-3 py-2.5 text-right">Amount Collected</th>
                     <th className="px-3.5 py-2.5 text-right">Action</th>
@@ -1480,7 +1332,7 @@ export default function ReportsPage() {
                 <tbody className="divide-y divide-border/50">
                   {filteredCollections.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-10 text-center text-xs text-muted-foreground">
+                      <td colSpan={6} className="py-10 text-center text-xs text-muted-foreground">
                         <AlertCircle className="mx-auto size-7 text-muted-foreground mb-2 opacity-50" />
                         No collection records found for selected filters.
                       </td>
@@ -1493,17 +1345,11 @@ export default function ReportsPage() {
                         return (
                           <tr key={col.id} className="transition-colors hover:bg-muted/20">
                             <td className="px-3.5 py-2.5 text-muted-foreground whitespace-nowrap">{col.date}</td>
-                            <td className="px-3 py-2.5 font-mono font-bold text-foreground">{col.code}</td>
                             <td className="px-3 py-2.5">
                               <p className="font-semibold text-foreground">{col.customerName}</p>
                               <p className="text-[10px] text-muted-foreground">{col.shopName}</p>
                             </td>
                             <td className="px-3 py-2.5 text-foreground">{cust?.officerName || "Finance"}</td>
-                            <td className="px-3 py-2.5">
-                              <span className="inline-flex rounded-xs bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
-                                {col.paymentMethod || "Bank Transfer"}
-                              </span>
-                            </td>
                             <td className="px-3 py-2.5 font-mono text-muted-foreground">
                               {col.allocations?.[0]?.orderCode || "Direct Payment"}
                             </td>
@@ -1543,7 +1389,6 @@ export default function ReportsPage() {
                     <th className="px-3 py-2.5">Phone</th>
                     <th className="px-3 py-2.5">Territory / Area</th>
                     <th className="px-3 py-2.5">MPO</th>
-                    <th className="px-3 py-2.5 text-right">Credit Limit</th>
                     <th className="px-3 py-2.5 text-right">Outstanding Due</th>
                     <th className="px-3 py-2.5 text-right">Lifetime Sales</th>
                     <th className="px-3.5 py-2.5 text-center">Status</th>
@@ -1552,7 +1397,7 @@ export default function ReportsPage() {
                 <tbody className="divide-y divide-border/50">
                   {filteredDueCustomers.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-10 text-center text-xs text-muted-foreground">
+                      <td colSpan={8} className="py-10 text-center text-xs text-muted-foreground">
                         <AlertCircle className="mx-auto size-7 text-muted-foreground mb-2 opacity-50" />
                         No customer dues match current filters.
                       </td>
@@ -1562,8 +1407,6 @@ export default function ReportsPage() {
                       .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
                       .map((cust) => {
                         const due = cust.outstandingBalance || 0
-                        const limit = cust.creditLimit || 150000
-                        const isOverLimit = due > limit
 
                         return (
                           <tr key={cust.id} className="transition-colors hover:bg-muted/20">
@@ -1575,9 +1418,6 @@ export default function ReportsPage() {
                             <td className="px-3 py-2.5 font-mono text-muted-foreground">{cust.phone}</td>
                             <td className="px-3 py-2.5">{cust.areaName}</td>
                             <td className="px-3 py-2.5">{cust.officerName}</td>
-                            <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">
-                              ৳ {limit.toLocaleString()}
-                            </td>
                             <td className="px-3 py-2.5 text-right font-mono font-bold text-amber-600 dark:text-amber-400">
                               ৳ {due.toLocaleString()}
                             </td>
@@ -1588,10 +1428,6 @@ export default function ReportsPage() {
                               {due === 0 ? (
                                 <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
                                   Clear
-                                </span>
-                              ) : isOverLimit ? (
-                                <span className="inline-flex rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-semibold text-rose-600">
-                                  Over Limit
                                 </span>
                               ) : (
                                 <span className="inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600">
@@ -1617,7 +1453,6 @@ export default function ReportsPage() {
                 <thead>
                   <tr className="border-b border-border/70 bg-muted/30 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                     <th className="px-3.5 py-2.5">Date</th>
-                    <th className="px-3 py-2.5">Return Slip</th>
                     <th className="px-3 py-2.5">Customer & Shop</th>
                     <th className="px-3 py-2.5">Restocked Depot</th>
                     <th className="px-3 py-2.5">Returned Products</th>
@@ -1629,7 +1464,7 @@ export default function ReportsPage() {
                 <tbody className="divide-y divide-border/50">
                   {filteredReturns.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-10 text-center text-xs text-muted-foreground">
+                      <td colSpan={7} className="py-10 text-center text-xs text-muted-foreground">
                         <AlertCircle className="mx-auto size-7 text-muted-foreground mb-2 opacity-50" />
                         No product return logs match current filters.
                       </td>
@@ -1640,7 +1475,6 @@ export default function ReportsPage() {
                       .map((ret) => (
                         <tr key={ret.id} className="transition-colors hover:bg-muted/20">
                           <td className="px-3.5 py-2.5 text-muted-foreground whitespace-nowrap">{ret.date}</td>
-                          <td className="px-3 py-2.5 font-mono font-bold text-foreground">{ret.code}</td>
                           <td className="px-3 py-2.5">
                             <p className="font-semibold text-foreground">{ret.customerName}</p>
                             <p className="text-[10px] text-muted-foreground">{ret.shopName}</p>
@@ -1679,184 +1513,19 @@ export default function ReportsPage() {
           )}
 
           {/* ============================================== */}
-          {/* REPORT TABLE 5: ORDER PIPELINE REPORT */}
-          {/* ============================================== */}
-          {activeReport === "orders" && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-border/70 bg-muted/30 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                    <th className="px-3.5 py-2.5">Date</th>
-                    <th className="px-3 py-2.5">Order Code</th>
-                    <th className="px-3 py-2.5">Customer</th>
-                    <th className="px-3 py-2.5">MPO</th>
-                    <th className="px-3 py-2.5">Depot</th>
-                    <th className="px-3 py-2.5 text-center">Items</th>
-                    <th className="px-3 py-2.5 text-right">Grand Total</th>
-                    <th className="px-3 py-2.5 text-right">Paid</th>
-                    <th className="px-3 py-2.5 text-right">Due</th>
-                    <th className="px-3 py-2.5 text-center">Status</th>
-                    <th className="px-3.5 py-2.5 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {filteredOrders.length === 0 ? (
-                    <tr>
-                      <td colSpan={11} className="py-10 text-center text-xs text-muted-foreground">
-                        <AlertCircle className="mx-auto size-7 text-muted-foreground mb-2 opacity-50" />
-                        No orders match current criteria.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredOrders
-                      .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
-                      .map((ord) => (
-                        <tr key={ord.id} className="transition-colors hover:bg-muted/20">
-                          <td className="px-3.5 py-2.5 text-muted-foreground whitespace-nowrap">{ord.date}</td>
-                          <td className="px-3 py-2.5 font-mono font-bold text-foreground">{ord.code}</td>
-                          <td className="px-3 py-2.5">
-                            <p className="font-semibold text-foreground">{ord.customerName}</p>
-                            <p className="text-[10px] text-muted-foreground">{ord.shopName}</p>
-                          </td>
-                          <td className="px-3 py-2.5">{ord.officerName}</td>
-                          <td className="px-3 py-2.5 text-muted-foreground">{ord.depotName}</td>
-                          <td className="px-3 py-2.5 text-center font-mono">{ord.totalItems}</td>
-                          <td className="px-3 py-2.5 text-right font-mono font-bold text-foreground">
-                            ৳ {ord.grandTotal.toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono text-emerald-600">
-                            ৳ {(ord.paidAmount || 0).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono text-amber-600">
-                            ৳ {(ord.dueAmount || (ord.status === "Approved" ? ord.grandTotal - (ord.paidAmount || 0) : 0)).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2.5 text-center">
-                            <span
-                              className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                ord.status === "Approved"
-                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                                  : ord.status === "Pending"
-                                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-                              }`}
-                            >
-                              {ord.status}
-                            </span>
-                          </td>
-                          <td className="px-3.5 py-2.5 text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={() => setModalInvoice(ord)}
-                              className="cursor-pointer text-primary hover:bg-primary/10"
-                              title="View Invoice"
-                            >
-                              <Eye className="size-3.5" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* ============================================== */}
-          {/* REPORT TABLE 6: STOCK VALUATION REPORT */}
-          {/* ============================================== */}
-          {activeReport === "stock" && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-border/70 bg-muted/30 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                    <th className="px-3.5 py-2.5">Product SKU</th>
-                    <th className="px-3.5 py-2.5">Depot Location</th>
-                    <th className="px-3.5 py-2.5">Pack Size</th>
-                    <th className="px-3.5 py-2.5 text-center">Available Stock</th>
-                    <th className="px-3.5 py-2.5 text-center">Threshold</th>
-                    <th className="px-3.5 py-2.5 text-right">Buy Price</th>
-                    <th className="px-3.5 py-2.5 text-right">Sell Price</th>
-                    <th className="px-3.5 py-2.5 text-right">Stock Valuation</th>
-                    <th className="px-3.5 py-2.5 text-center">Stock Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50">
-                  {filteredStockRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="py-10 text-center text-xs text-muted-foreground">
-                        <AlertCircle className="mx-auto size-7 text-muted-foreground mb-2 opacity-50" />
-                        No depot stock rows match current filter options.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredStockRows
-                      .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
-                      .map((row) => {
-                        const buyP = row.product?.buyPrice || 0
-                        const sellP = row.product?.sellPrice || row.product?.price || 0
-                        const valuation = sellP * row.item.quantity
-                        const isLow = row.item.quantity <= row.item.minThreshold
-
-                        return (
-                          <tr key={`${row.depotId}-${row.item.productId}`} className="transition-colors hover:bg-muted/20">
-                            <td className="px-3.5 py-2.5">
-                              <p className="font-semibold text-foreground">{row.item.productName}</p>
-                              <p className="font-mono text-[10px] text-muted-foreground">{row.item.productCode}</p>
-                            </td>
-                            <td className="px-3.5 py-2.5 font-medium text-foreground">{row.depotName}</td>
-                            <td className="px-3.5 py-2.5 text-muted-foreground font-mono">{row.item.packSize}</td>
-                            <td className="px-3.5 py-2.5 text-center font-mono font-bold text-foreground">
-                              {row.item.quantity}
-                            </td>
-                            <td className="px-3 py-2.5 text-center font-mono text-muted-foreground">
-                              {row.item.minThreshold}
-                            </td>
-                            <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">
-                              ৳ {buyP}
-                            </td>
-                            <td className="px-3 py-2.5 text-right font-mono text-foreground font-medium">
-                              ৳ {sellP}
-                            </td>
-                            <td className="px-3 py-2.5 text-right font-mono font-bold text-primary">
-                              ৳ {valuation.toLocaleString()}
-                            </td>
-                            <td className="px-3.5 py-2.5 text-center">
-                              {isLow ? (
-                                <span className="inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600 border border-amber-500/20">
-                                  Low Stock
-                                </span>
-                              ) : (
-                                <span className="inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 border border-emerald-500/20">
-                                  Optimal
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        )
-                      })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* ============================================== */}
           {/* PAGINATION FOOTER */}
           {/* ============================================== */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 p-3 border-t border-border/60 text-xs text-muted-foreground">
             <div>
               Showing {(() => {
                 const total =
-                  activeReport === "sales" || activeReport === "orders"
+                  activeReport === "sales"
                     ? filteredOrders.length
                     : activeReport === "collections"
                     ? filteredCollections.length
                     : activeReport === "outstanding"
                     ? filteredDueCustomers.length
-                    : activeReport === "returns"
-                    ? filteredReturns.length
-                    : filteredStockRows.length
+                    : filteredReturns.length
                 const start = total === 0 ? 0 : (currentPage - 1) * rowsPerPage + 1
                 const end = Math.min(currentPage * rowsPerPage, total)
                 return `${start} to ${end} of ${total} entries`
@@ -1878,35 +1547,47 @@ export default function ReportsPage() {
                 {Math.max(
                   1,
                   Math.ceil(
-                    (activeReport === "sales" || activeReport === "orders"
+                    (activeReport === "sales"
                       ? filteredOrders.length
                       : activeReport === "collections"
                       ? filteredCollections.length
                       : activeReport === "outstanding"
                       ? filteredDueCustomers.length
-                      : activeReport === "returns"
-                      ? filteredReturns.length
-                      : filteredStockRows.length) / rowsPerPage
+                      : filteredReturns.length) / rowsPerPage
                   )
                 )}
               </span>
               <Button
                 variant="outline"
                 size="icon-xs"
-                disabled={(() => {
-                  const total =
-                    activeReport === "sales" || activeReport === "orders"
+                disabled={
+                  currentPage >=
+                  Math.ceil(
+                    (activeReport === "sales"
                       ? filteredOrders.length
                       : activeReport === "collections"
                       ? filteredCollections.length
                       : activeReport === "outstanding"
                       ? filteredDueCustomers.length
-                      : activeReport === "returns"
-                      ? filteredReturns.length
-                      : filteredStockRows.length
-                  return currentPage >= Math.ceil(total / rowsPerPage)
-                })()}
-                onClick={() => setCurrentPage((p) => p + 1)}
+                      : filteredReturns.length) / rowsPerPage
+                  )
+                }
+                onClick={() =>
+                  setCurrentPage((p) =>
+                    Math.min(
+                      Math.ceil(
+                        (activeReport === "sales"
+                          ? filteredOrders.length
+                          : activeReport === "collections"
+                          ? filteredCollections.length
+                          : activeReport === "outstanding"
+                          ? filteredDueCustomers.length
+                          : filteredReturns.length) / rowsPerPage
+                      ),
+                      p + 1
+                    )
+                  )
+                }
                 className="cursor-pointer"
               >
                 <ChevronRight className="size-3.5" />
@@ -2018,7 +1699,7 @@ export default function ReportsPage() {
                 <Banknote className="size-5 text-emerald-600" />
                 <div>
                   <h3 className="text-sm font-bold text-foreground">
-                    Receipt: {modalReceipt.code}
+                    Collection Receipt
                   </h3>
                   <p className="text-xs text-muted-foreground">{modalReceipt.date}</p>
                 </div>
@@ -2037,10 +1718,6 @@ export default function ReportsPage() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Customer:</span>
                 <strong className="text-foreground">{modalReceipt.customerName} ({modalReceipt.shopName})</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Method:</span>
-                <span className="font-semibold text-foreground">{modalReceipt.paymentMethod || "Bank Transfer"}</span>
               </div>
               <div className="flex justify-between border-t border-border/60 pt-2 text-sm font-bold">
                 <span>Amount:</span>
@@ -2073,7 +1750,7 @@ export default function ReportsPage() {
                 <RotateCcw className="size-5 text-rose-500" />
                 <div>
                   <h3 className="text-sm font-bold text-foreground">
-                    Return Voucher: {modalReturn.code}
+                    Return Voucher
                   </h3>
                   <p className="text-xs text-muted-foreground">{modalReturn.date}</p>
                 </div>

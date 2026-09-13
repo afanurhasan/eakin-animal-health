@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import Link from "next/link"
 import {
   RotateCcw,
@@ -1132,12 +1133,23 @@ export default function ProductReturnsPage() {
             {/* Slip Body */}
             <div className="p-6 space-y-6">
               {/* Top Branding */}
-              <div className="flex items-start justify-between border-b border-slate-200 pb-4">
-                <div>
-                  <div className="text-xl font-black tracking-tight text-emerald-800">
-                    EAKIN ANIMAL HEALTH
+              <div className="flex items-center justify-between border-b border-slate-200 pb-4 gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center">
+                    <Image
+                      src="/logo.jpeg"
+                      alt="Eakin Animal Health Logo"
+                      width={160}
+                      height={45}
+                      className="h-10 w-auto object-contain"
+                      priority
+                    />
                   </div>
-                  <p className="text-xs font-semibold text-slate-600 mt-0.5">Goods Return Voucher</p>
+                  <div>
+                    <h1 className="text-base font-bold tracking-tight text-slate-900">
+                      Eakin Animal Health Ltd.
+                    </h1>
+                  </div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs text-slate-500 font-medium">{selectedSlip.date}</div>
@@ -1165,9 +1177,6 @@ export default function ProductReturnsPage() {
                   <div className="text-slate-700">
                     <span className="text-slate-500">Restocked To:</span>{" "}
                     <strong>{selectedSlip.depotName}</strong>
-                  </div>
-                  <div className="text-slate-700 mt-0.5">
-                    <span className="text-slate-500">Recorded By:</span> {selectedSlip.recordedBy}
                   </div>
                 </div>
               </div>
