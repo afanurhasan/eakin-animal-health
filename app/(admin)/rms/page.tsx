@@ -681,16 +681,18 @@ export default function RegionalManagersPage() {
                   className={`h-8 w-full rounded border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring ${formErrors.regionalOfficeId ? "border-destructive focus:ring-destructive" : "border-input"}`}
                 >
                   {regionalOffices.map((ro) => {
-                    const occupyingRM = rms.find((r) => r.regionalOfficeId === ro.id && (!editingRM || r.id !== editingRM.id))
+                    const count = rms.filter(
+                      (r) => r.regionalOfficeId === ro.id && (!editingRM || r.id !== editingRM.id)
+                    ).length
                     return (
                       <option key={ro.id} value={ro.id}>
-                        {ro.name} ({ro.code}){occupyingRM ? ` — Assigned to ${occupyingRM.name}` : ""}
+                        {ro.name} ({ro.code}){count > 0 ? ` — (${count} RM${count > 1 ? "s" : ""} currently assigned)` : ""}
                       </option>
                     )
                   })}
                 </select>
                 <p className="text-[10px] text-muted-foreground">
-                  One RM belongs to exactly one Regional Office.
+                  Select the Regional Office this RM belongs to (multiple RMs can belong to the same Regional Office).
                 </p>
                 {formErrors.regionalOfficeId && (
                   <p className="text-[11px] text-destructive">{formErrors.regionalOfficeId}</p>

@@ -139,3 +139,73 @@ export function isDateInRange(dateStr: string, startDate?: string, endDate?: str
 
   return true
 }
+
+/**
+ * Convert numeric currency amounts to English words (Bangladeshi Lakh/Crore format)
+ * Example: 197980 -> "Taka One Lakh Ninety Seven Thousand Nine Hundred Eighty"
+ */
+export function numberToWords(amount: number): string {
+  if (amount === undefined || amount === null || isNaN(amount)) return "Taka Zero"
+  const integerPart = Math.floor(Math.abs(amount))
+  const decimalPart = Math.round((Math.abs(amount) - integerPart) * 100)
+
+  const ones = [
+    "", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+    "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
+    "Seventeen", "Eighteen", "Nineteen"
+  ]
+  const tens = [
+    "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"
+  ]
+
+  function convertTwoDigits(n: number): string {
+    if (n < 20) return ones[n]
+    const ten = Math.floor(n / 10)
+    const unit = n % 10
+    return (tens[ten] + (unit > 0 ? " " + ones[unit] : "")).trim()
+  }
+
+  function convertThreeDigits(n: number): string {
+    let str = ""
+    if (n >= 100) {
+      str += ones[Math.floor(n / 100)] + " Hundred"
+      n %= 100
+      if (n > 0) str += " "
+    }
+    if (n > 0) {
+      str += convertTwoDigits(n)
+    }
+    return str.trim()
+  }
+
+  if (integerPart === 0 && decimalPart === 0) return "Taka Zero"
+
+  let n = integerPart
+  const crore = Math.floor(n / 10000000)
+  n %= 10000000
+  const lakh = Math.floor(n / 100000)
+  n %= 100000
+  const thousand = Math.floor(n / 1000)
+  n %= 1000
+  const remainder = n
+
+  const parts: string[] = []
+  if (crore > 0) {
+    parts.push((crore >= 100 ? convertThreeDigits(crore) : convertTwoDigits(crore)) + " Crore")
+  }
+  if (lakh > 0) {
+    parts.push(convertTwoDigits(lakh) + " Lakh")
+  }
+  if (thousand > 0) {
+    parts.push(convertTwoDigits(thousand) + " Thousand")
+  }
+  if (remainder > 0) {
+    parts.push(convertThreeDigits(remainder))
+  }
+
+  let text = "Taka " + (parts.length > 0 ? parts.join(" ") : "Zero")
+  if (decimalPart > 0) {
+    text += " and " + convertTwoDigits(decimalPart) + " Paisa"
+  }
+  return text
+}

@@ -139,23 +139,13 @@ export default function SingleProductPage() {
 
             {/* Right Metric Highlights */}
             <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-              {/* Buy Price */}
+              {/* TP (Trade Price) */}
               <div className="rounded-lg border border-border/80 bg-muted/20 px-3.5 py-2.5 text-right">
                 <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-                  Buy Price
-                </div>
-                <div className="font-mono text-lg font-bold text-foreground">
-                  ৳ {(product.buyPrice ?? Math.round(product.price * 0.8)).toLocaleString()}
-                </div>
-              </div>
-
-              {/* Sell Price */}
-              <div className="rounded-lg border border-border/80 bg-muted/20 px-3.5 py-2.5 text-right">
-                <div className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">
-                  Sell Price (TP)
+                  TP (Trade Price)
                 </div>
                 <div className="font-mono text-lg font-bold text-primary">
-                  ৳ {(product.sellPrice ?? product.price).toLocaleString()}
+                  ৳ {(product.tp ?? product.sellPrice ?? product.price).toLocaleString()}
                 </div>
               </div>
 

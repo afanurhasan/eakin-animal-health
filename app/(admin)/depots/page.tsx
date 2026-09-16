@@ -11,6 +11,7 @@ import {
   MapPin,
   ArrowRight,
   Boxes,
+  Filter,
   X,
   AlertTriangle,
   CheckCircle2,
@@ -21,10 +22,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { initialDepots, initialDepotStocks, type Depot } from "@/lib/mock-data"
+import { useAppState } from "@/lib/store"
 
 export default function DepotsPage() {
+  const { regionalOffices } = useAppState()
   const [depots, setDepots] = React.useState<Depot[]>(initialDepots)
   const [searchQuery, setSearchQuery] = React.useState("")
+  const [selectedROFilter, setSelectedROFilter] = React.useState("all")
 
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
@@ -42,15 +46,20 @@ export default function DepotsPage() {
 
   // Filtered depots
   const filteredDepots = React.useMemo(() => {
-    const q = searchQuery.toLowerCase().trim()
-    if (!q) return depots
-    return depots.filter(
-      (d) =>
+    return depots.filter((d) => {
+      const q = searchQuery.toLowerCase().trim()
+      const matchesSearch =
+        !q ||
         d.code.toLowerCase().includes(q) ||
         d.name.toLowerCase().includes(q) ||
         d.location.toLowerCase().includes(q)
-    )
-  }, [depots, searchQuery])
+
+      const targetRO = selectedROFilter !== "all" ? regionalOffices.find((r) => r.id === selectedROFilter) : null
+      const matchesRO = !targetRO || targetRO.depotId === d.id
+
+      return matchesSearch && matchesRO
+    })
+  }, [depots, searchQuery, selectedROFilter, regionalOffices])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -164,7 +173,7 @@ export default function DepotsPage() {
             Depots
           </h2>
           <p className="text-xs text-muted-foreground">
-            Total Depots: <span className="font-semibold text-foreground">{depots.length}</span>
+            Total Depots: <span className="font-semibold text-foreground">{depots.length}</span> across Regional Offices
           </p>
         </div>
 
@@ -183,21 +192,41 @@ export default function DepotsPage() {
       {/* Main Depots Table Card */}
       <Card className="border-border/80 bg-card shadow-xs">
         <CardHeader className="border-b border-border/70 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <CardTitle className="text-sm font-semibold text-foreground">
               Depots ({filteredDepots.length})
             </CardTitle>
 
-            {/* Quick Search */}
-            <div className="relative w-full sm:w-72">
-              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search depots..."
-                className="h-8 pl-8 text-xs"
-              />
+            {/* Filter Controls: Regional Office Select & Search Bar */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {/* Regional Office Filter Dropdown */}
+              <div className="flex items-center gap-1.5">
+                <Filter className="size-3.5 text-muted-foreground" />
+                <select
+                  value={selectedROFilter}
+                  onChange={(e) => setSelectedROFilter(e.target.value)}
+                  className="h-8 rounded-none border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                >
+                  <option value="all">All Regional Offices</option>
+                  {regionalOffices.map((ro) => (
+                    <option key={ro.id} value={ro.id}>
+                      {ro.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quick Search */}
+              <div className="relative w-full sm:w-64">
+                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search depots..."
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
             </div>
           </div>
         </CardHeader>

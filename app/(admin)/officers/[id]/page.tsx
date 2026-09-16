@@ -9,6 +9,7 @@ import {
   UserRound,
   UsersRound,
   MapPin,
+  MapPinned,
   Phone,
   Mail,
   Store,
@@ -99,6 +100,10 @@ export default function MPODetailPage() {
                   <span className="flex items-center gap-1">
                     <MapPin className="size-3 text-muted-foreground" />
                     <span>Assigned Area: <strong className="text-foreground">{officer.areaName}</strong></span>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <MapPinned className="size-3 text-primary" />
+                    <span>Territory: <strong className="text-primary font-semibold">{officer.territoryName || "-"}</strong></span>
                   </span>
                   <span className="flex items-center gap-1">
                     <UserRound className="size-3 text-muted-foreground" />

@@ -223,7 +223,7 @@ export function OfficerSidebar({ isOpen, onClose }: OfficerSidebarProps) {
                 href={item.href}
                 onClick={onClose}
                 className={cn(
-                  "group flex items-center gap-3 rounded-md px-3 py-2 text-xs font-medium transition-colors",
+                  "group flex items-center gap-3 rounded-md px-3 py-2 text-xs font-medium transition-colors cursor-pointer",
                   isActive
                     ? "bg-primary text-primary-foreground shadow-xs font-semibold"
                     : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"

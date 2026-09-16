@@ -8,6 +8,7 @@ import {
   initialDepots,
   initialDepotStocks,
   initialAreasWithDepot,
+  initialTerritories,
   initialRegionalOffices,
   initialRMs,
   initialAMs,
@@ -24,6 +25,7 @@ import {
   type DepotStockItem,
   type RegionalOffice,
   type AreaItem,
+  type TerritoryItem,
   type RMItem,
   type AMItem,
   type Product,
@@ -35,20 +37,21 @@ import {
 import { formatDateTime } from "@/lib/utils"
 
 const STORAGE_KEYS = {
-  ORDERS: "eakin_erp_orders_v2",
-  CUSTOMERS: "eakin_erp_customers_v2",
-  OFFICERS: "eakin_erp_officers_v2",
-  AMS: "eakin_erp_ams_v2",
-  RMS: "eakin_erp_rms_v2",
-  REGIONAL_OFFICES: "eakin_erp_regional_offices_v2",
-  AREAS: "eakin_erp_areas_v2",
-  DEPOT_STOCKS: "eakin_erp_depot_stocks_v2",
-  COLLECTIONS: "eakin_erp_collections_v2",
-  PRODUCT_RETURNS: "eakin_erp_returns_v2",
-  CURRENT_OFFICER_ID: "eakin_erp_current_officer_id_v2",
-  CURRENT_AM_ID: "eakin_erp_current_am_id_v2",
-  CURRENT_RM_ID: "eakin_erp_current_rm_id_v2",
-  CURRENT_ROLE: "eakin_erp_current_role_v2",
+  ORDERS: "eakin_erp_orders_v3",
+  CUSTOMERS: "eakin_erp_customers_v3",
+  OFFICERS: "eakin_erp_officers_v3",
+  AMS: "eakin_erp_ams_v3",
+  RMS: "eakin_erp_rms_v3",
+  REGIONAL_OFFICES: "eakin_erp_regional_offices_v3",
+  AREAS: "eakin_erp_areas_v3",
+  TERRITORIES: "eakin_erp_territories_v3",
+  DEPOT_STOCKS: "eakin_erp_depot_stocks_v3",
+  COLLECTIONS: "eakin_erp_collections_v3",
+  PRODUCT_RETURNS: "eakin_erp_returns_v3",
+  CURRENT_OFFICER_ID: "eakin_erp_current_officer_id_v3",
+  CURRENT_AM_ID: "eakin_erp_current_am_id_v3",
+  CURRENT_RM_ID: "eakin_erp_current_rm_id_v3",
+  CURRENT_ROLE: "eakin_erp_current_role_v3",
 }
 
 export type StaffRole = "admin" | "officer" | "am" | "rm"
@@ -69,6 +72,7 @@ interface AppStateContextType {
   depotStocks: Record<string, DepotStockItem[]>
   regionalOffices: RegionalOffice[]
   areas: AreaItem[]
+  territories: TerritoryItem[]
   rms: RMItem[]
   ams: AMItem[]
   catalog: Product[]
@@ -108,6 +112,11 @@ interface AppStateContextType {
   updateArea: (id: string, updates: Partial<AreaItem>) => void
   deleteArea: (id: string) => void
 
+  // Territory Mutations (Admin)
+  addTerritory: (territory: Omit<TerritoryItem, "id">) => TerritoryItem
+  updateTerritory: (id: string, updates: Partial<TerritoryItem>) => void
+  deleteTerritory: (id: string) => void
+
   // Staff Mutations (Admin)
   addOfficer: (off: Omit<SalesOfficerItem, "id">) => SalesOfficerItem
   updateOfficer: (id: string, updates: Partial<SalesOfficerItem>) => void
@@ -128,13 +137,14 @@ interface AppStateContextType {
     bonusItems?: Order["bonusItems"]
   ) => void
   cancelOrder: (orderId: string) => void
+  updateOrder: (orderId: string, updates: Partial<Order>) => void
 
   // Customer Mutations (Admin)
   addCustomer: (cust: Omit<CustomerItem, "id">) => CustomerItem
   updateCustomer: (id: string, updates: Partial<CustomerItem>) => void
   deleteCustomer: (id: string) => void
 
-  addCollection: (col: Omit<CollectionItem, "id" | "code" | "date">) => CollectionItem
+  addCollection: (col: Omit<CollectionItem, "id" | "code"> & { date?: string }) => CollectionItem
   addProductReturn: (ret: Omit<ProductReturnItem, "id" | "code" | "date">) => ProductReturnItem
   addStockTransfer: (transfer: Omit<StockTransfer, "id" | "code" | "date" | "status">) => StockTransfer
   addStockMovement: (movement: Omit<StockMovement, "id" | "date">) => StockMovement
@@ -157,6 +167,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [depotStocks, setDepotStocks] = React.useState<Record<string, DepotStockItem[]>>(initialDepotStocks)
   const [regionalOffices, setRegionalOffices] = React.useState<RegionalOffice[]>(initialRegionalOffices)
   const [areas, setAreas] = React.useState<AreaItem[]>(initialAreasWithDepot)
+  const [territories, setTerritories] = React.useState<TerritoryItem[]>(initialTerritories)
   const [rms, setRms] = React.useState<RMItem[]>(initialRMs)
   const [ams, setAms] = React.useState<AMItem[]>(initialAMs)
   const [catalog] = React.useState<Product[]>(productCatalog)
@@ -183,6 +194,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         "eakin_erp_rms", "eakin_erp_rms_v2",
         "eakin_erp_regional_offices", "eakin_erp_regional_offices_v2",
         "eakin_erp_areas", "eakin_erp_areas_v2",
+        "eakin_erp_territories", "eakin_erp_territories_v2",
         "eakin_erp_depot_stocks", "eakin_erp_depot_stocks_v2",
         "eakin_erp_collections", "eakin_erp_collections_v2",
         "eakin_erp_returns", "eakin_erp_returns_v2",
@@ -202,15 +214,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       const storedCustomers = localStorage.getItem(STORAGE_KEYS.CUSTOMERS)
       if (storedCustomers) {
         try {
-          let parsedCustomers: CustomerItem[] = JSON.parse(storedCustomers)
-          // Ensure strictly up to initialCustomers without excess items
-          const validIds = new Set(initialCustomers.map((c) => c.id))
-          if (parsedCustomers.some((c) => !validIds.has(c.id)) || parsedCustomers.length !== initialCustomers.length) {
-            parsedCustomers = initialCustomers
-            localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(initialCustomers))
-          }
-          setCustomers(parsedCustomers)
-        } catch (_) {}
+          const parsedCustomers: CustomerItem[] = JSON.parse(storedCustomers)
+          const existingIds = new Set(parsedCustomers.map((c) => c.id))
+          const missingInitial = initialCustomers.filter((c) => !existingIds.has(c.id))
+          const updatedList = [...parsedCustomers, ...missingInitial]
+          setCustomers(updatedList)
+          localStorage.setItem(STORAGE_KEYS.CUSTOMERS, JSON.stringify(updatedList))
+        } catch (_) {
+          setCustomers(initialCustomers)
+        }
+      } else {
+        setCustomers(initialCustomers)
       }
 
       const storedOfficers = localStorage.getItem(STORAGE_KEYS.OFFICERS)
@@ -275,6 +289,19 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
             localStorage.setItem(STORAGE_KEYS.AREAS, JSON.stringify(initialAreasWithDepot))
           }
           setAreas(parsedAreas)
+        } catch (_) {}
+      }
+
+      const storedTerritories = localStorage.getItem(STORAGE_KEYS.TERRITORIES)
+      if (storedTerritories) {
+        try {
+          let parsedTerritories: TerritoryItem[] = JSON.parse(storedTerritories)
+          const validIds = new Set(initialTerritories.map((t) => t.id))
+          if (parsedTerritories.some((t) => !validIds.has(t.id)) || parsedTerritories.length !== initialTerritories.length) {
+            parsedTerritories = initialTerritories
+            localStorage.setItem(STORAGE_KEYS.TERRITORIES, JSON.stringify(initialTerritories))
+          }
+          setTerritories(parsedTerritories)
         } catch (_) {}
       }
 
@@ -376,6 +403,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       console.error(e)
     }
   }, [areas, isLoaded])
+
+  React.useEffect(() => {
+    if (!isLoaded) return
+    try {
+      localStorage.setItem(STORAGE_KEYS.TERRITORIES, JSON.stringify(territories))
+    } catch (e) {
+      console.error(e)
+    }
+  }, [territories, isLoaded])
 
   React.useEffect(() => {
     if (!isLoaded) return
@@ -750,6 +786,27 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setAreas((prev) => prev.filter((a) => a.id !== id))
   }, [])
 
+  // Territory Mutations (Admin)
+  const addTerritory = React.useCallback(
+    (terData: Omit<TerritoryItem, "id">): TerritoryItem => {
+      const newTer: TerritoryItem = {
+        ...terData,
+        id: `ter-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      }
+      setTerritories((prev) => [newTer, ...prev])
+      return newTer
+    },
+    []
+  )
+
+  const updateTerritory = React.useCallback((id: string, updates: Partial<TerritoryItem>) => {
+    setTerritories((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)))
+  }, [])
+
+  const deleteTerritory = React.useCallback((id: string) => {
+    setTerritories((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
   const addRM = React.useCallback(
     (rmData: Omit<RMItem, "id">): RMItem => {
       const newRM: RMItem = {
@@ -757,34 +814,21 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         id: `rm-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         pin: rmData.pin || "123456",
       }
-      setRms((prev) => {
-        const targetROId = newRM.regionalOfficeId
-        const updated = prev.map((r) => {
-          if (targetROId && r.regionalOfficeId === targetROId) {
-            return { ...r, regionalOfficeId: "", regionalOfficeName: "" }
-          }
-          return r
-        })
-        return [newRM, ...updated]
-      })
+      setRms((prev) => [newRM, ...prev])
       return newRM
     },
     []
   )
 
   const updateRM = React.useCallback((id: string, updates: Partial<RMItem>) => {
-    setRms((prev) => {
-      const targetROId = updates.regionalOfficeId
-      return prev.map((r) => {
+    setRms((prev) =>
+      prev.map((r) => {
         if (r.id === id) {
           return { ...r, ...updates }
         }
-        if (targetROId && r.regionalOfficeId === targetROId) {
-          return { ...r, regionalOfficeId: "", regionalOfficeName: "" }
-        }
         return r
       })
-    })
+    )
   }, [])
 
   const deleteRM = React.useCallback((id: string) => {
@@ -799,9 +843,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         return prev.map((r) => {
           if (rmId && r.id === rmId) {
             return { ...r, regionalOfficeId: roId, regionalOfficeName: roName }
-          }
-          if (r.regionalOfficeId === roId) {
-            return { ...r, regionalOfficeId: "", regionalOfficeName: "" }
           }
           return r
         })
@@ -916,6 +957,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     )
   }, [])
 
+  const updateOrder = React.useCallback((orderId: string, updates: Partial<Order>) => {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, ...updates } : o))
+    )
+  }, [])
+
   // Customer Mutations (for Admin actions)
   const addCustomer = React.useCallback(
     (custData: Omit<CustomerItem, "id">): CustomerItem => {
@@ -924,7 +971,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         id: `cust-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         totalOrders: 0,
         totalSpent: 0,
-        outstandingBalance: 0,
+        outstandingBalance:
+          custData.outstandingBalance !== undefined ? custData.outstandingBalance : 0,
       }
       setCustomers((prev) => [newCust, ...prev])
       return newCust
@@ -941,12 +989,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const addCollection = React.useCallback(
-    (col: Omit<CollectionItem, "id" | "code" | "date">): CollectionItem => {
+    (col: Omit<CollectionItem, "id" | "code"> & { date?: string }): CollectionItem => {
+      let nextNum = collections.length + 1
       const newCol: CollectionItem = {
         ...col,
-        id: `col-${Date.now()}`,
-        code: `COL-${String(collections.length + 1).padStart(3, "0")}`,
-        date: new Date().toISOString().split("T")[0],
+        id: `col-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        code: `COL-2026-${String(nextNum).padStart(3, "0")}`,
+        date: col.date || formatDateTime(new Date()),
       }
       setCollections((prev) => [newCol, ...prev])
       return newCol
@@ -1006,6 +1055,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         depotStocks,
         regionalOffices,
         areas,
+        territories,
         rms,
         ams,
         catalog,
@@ -1032,6 +1082,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         addArea,
         updateArea,
         deleteArea,
+        addTerritory,
+        updateTerritory,
+        deleteTerritory,
         addOfficer,
         updateOfficer,
         deleteOfficer,
@@ -1045,6 +1098,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         createOrder,
         approveOrder,
         cancelOrder,
+        updateOrder,
         addCustomer,
         updateCustomer,
         deleteCustomer,

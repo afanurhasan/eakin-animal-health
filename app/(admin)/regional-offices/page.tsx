@@ -12,6 +12,7 @@ import {
   MapPin,
   UserRound,
   Eye,
+  Filter,
   X,
   AlertTriangle,
   CheckCircle2,
@@ -36,6 +37,7 @@ export default function RegionalOfficesPage() {
   } = useAppState()
 
   const [searchQuery, setSearchQuery] = React.useState("")
+  const [selectedDepotFilter, setSelectedDepotFilter] = React.useState("all")
 
   // Modal states
   const [isCreateOpen, setIsCreateOpen] = React.useState(false)
@@ -68,16 +70,21 @@ export default function RegionalOfficesPage() {
 
   // Filtered Regional Offices
   const filteredOffices = React.useMemo(() => {
-    const q = searchQuery.toLowerCase().trim()
-    if (!q) return regionalOffices
-    return regionalOffices.filter(
-      (ro) =>
+    return regionalOffices.filter((ro) => {
+      const q = searchQuery.toLowerCase().trim()
+      const matchesSearch =
+        !q ||
         ro.code.toLowerCase().includes(q) ||
         ro.name.toLowerCase().includes(q) ||
         (ro.location && ro.location.toLowerCase().includes(q)) ||
         (ro.depotName && ro.depotName.toLowerCase().includes(q))
-    )
-  }, [regionalOffices, searchQuery])
+
+      const matchesDepot =
+        selectedDepotFilter === "all" || ro.depotId === selectedDepotFilter
+
+      return matchesSearch && matchesDepot
+    })
+  }, [regionalOffices, searchQuery, selectedDepotFilter])
 
   // Open Create Modal
   const handleOpenCreate = () => {
@@ -181,107 +188,67 @@ export default function RegionalOfficesPage() {
         </div>
       )}
 
-      {/* Header */}
+      {/* Top Action Bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground">
-            Regional Office Management
-          </h1>
+          <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+            Regional Offices
+          </h2>
           <p className="text-xs text-muted-foreground">
-            Manage regional office organizational hierarchy and associated primary depots.
+            Total Regional Offices: <span className="font-semibold text-foreground">{regionalOffices.length}</span> across operating hubs
           </p>
         </div>
+
+        {/* Add Regional Office Button */}
         <Button
+          type="button"
           onClick={handleOpenCreate}
           size="sm"
-          className="cursor-pointer gap-1.5 self-start sm:self-auto"
+          className="cursor-pointer gap-1.5 font-medium shadow-xs"
         >
-          <Plus className="size-3.5" />
+          <Plus className="size-4" />
           <span>Add Regional Office</span>
         </Button>
       </div>
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Card className="border-border/80 bg-card shadow-xs">
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-            <CardTitle className="text-[11px] font-medium text-muted-foreground">
-              Total Regional Offices
-            </CardTitle>
-            <Building className="size-3.5 text-primary" />
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="text-lg font-bold text-foreground">
-              {regionalOffices.length}
-            </div>
-            <p className="text-[10px] text-muted-foreground">Operating hubs</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/80 bg-card shadow-xs">
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-            <CardTitle className="text-[11px] font-medium text-muted-foreground">
-              Connected Areas
-            </CardTitle>
-            <MapPin className="size-3.5 text-primary" />
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="text-lg font-bold text-foreground">
-              {areas.length}
-            </div>
-            <p className="text-[10px] text-muted-foreground">Across all regions</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/80 bg-card shadow-xs">
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-            <CardTitle className="text-[11px] font-medium text-muted-foreground">
-              Regional Managers
-            </CardTitle>
-            <UserRound className="size-3.5 text-primary" />
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="text-lg font-bold text-foreground">
-              {regionalOffices.filter((ro) => rms.some((r) => r.regionalOfficeId === ro.id)).length}
-            </div>
-            <p className="text-[10px] text-muted-foreground">Assigned to offices</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/80 bg-card shadow-xs">
-          <CardHeader className="flex flex-row items-center justify-between pb-1 pt-3 px-4">
-            <CardTitle className="text-[11px] font-medium text-muted-foreground">
-              Connected Depots
-            </CardTitle>
-            <Building2 className="size-3.5 text-primary" />
-          </CardHeader>
-          <CardContent className="px-4 pb-3">
-            <div className="text-lg font-bold text-foreground">
-              {depots.length}
-            </div>
-            <p className="text-[10px] text-muted-foreground">Fulfillment centers</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Main Table Card */}
+      {/* Main Table Card with Search & Primary Depot Filter */}
       <Card className="border-border/80 bg-card shadow-xs">
-        <CardHeader className="p-4 pb-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <CardHeader className="border-b border-border/70 p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <CardTitle className="text-sm font-semibold text-foreground">
               Regional Offices ({filteredOffices.length})
             </CardTitle>
 
-            {/* Search Input */}
-            <div className="relative w-full sm:w-64">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search regional offices..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 pl-8 text-xs"
-                aria-label="Search regional offices"
-              />
+            {/* Filter Controls: Depot Select & Search Bar */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {/* Primary Depot Filter Dropdown */}
+              <div className="flex items-center gap-1.5">
+                <Filter className="size-3.5 text-muted-foreground" />
+                <select
+                  value={selectedDepotFilter}
+                  onChange={(e) => setSelectedDepotFilter(e.target.value)}
+                  className="h-8 rounded-none border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                >
+                  <option value="all">All Depots</option>
+                  {depots.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quick Search */}
+              <div className="relative w-full sm:w-64">
+                <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search regional offices..."
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -289,23 +256,38 @@ export default function RegionalOfficesPage() {
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-y border-border/80 bg-muted/40 text-[11px] font-semibold text-muted-foreground uppercase">
+              <thead className="border-b border-border bg-muted/40 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                 <tr>
-                  <th scope="col" className="px-4 py-2.5">Code</th>
-                  <th scope="col" className="px-4 py-2.5">Regional Office</th>
-                  <th scope="col" className="px-4 py-2.5">Primary Depot</th>
-                  <th scope="col" className="px-4 py-2.5">Areas</th>
-                  <th scope="col" className="px-4 py-2.5">Assigned RM</th>
-                  <th scope="col" className="px-4 py-2.5 text-right">Actions</th>
+                  <th scope="col" className="w-16 px-4 py-3 text-center">
+                    SL
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Office Code
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Regional Office
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Primary Depot
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Areas
+                  </th>
+                  <th scope="col" className="px-4 py-3">
+                    Regional Manager(s)
+                  </th>
+                  <th scope="col" className="w-44 px-4 py-3 text-right">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
                 {filteredOffices.length > 0 ? (
-                  filteredOffices.map((office) => {
+                  filteredOffices.map((office, index) => {
                     const officeAreas = areas.filter(
                       (a) => a.regionalOfficeId === office.id
                     )
-                    const assignedRM = rms.find(
+                    const officeRMs = rms.filter(
                       (r) => r.regionalOfficeId === office.id
                     )
 
@@ -314,6 +296,11 @@ export default function RegionalOfficesPage() {
                         key={office.id}
                         className="transition-colors hover:bg-muted/30"
                       >
+                        {/* Serial Number */}
+                        <td className="px-4 py-3 text-center font-medium text-muted-foreground">
+                          {index + 1}
+                        </td>
+
                         {/* Code */}
                         <td className="px-4 py-3 font-mono font-medium text-primary">
                           {office.code}
@@ -347,15 +334,23 @@ export default function RegionalOfficesPage() {
                           </span>
                         </td>
 
-                        {/* Assigned RM (1 Office = 1 RM) */}
+                        {/* Assigned RM(s) */}
                         <td className="px-4 py-3">
-                          {assignedRM ? (
-                            <span className="inline-flex items-center gap-1.5 text-xs text-foreground font-medium">
-                              <UserRound className="size-3.5 text-primary" />
-                              <span>{assignedRM.name}</span>
-                            </span>
+                          {officeRMs.length > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              {officeRMs.map((rm) => (
+                                <span
+                                  key={rm.id}
+                                  className="inline-flex items-center gap-1.5 text-xs text-foreground font-medium"
+                                >
+                                  <UserRound className="size-3.5 text-primary shrink-0" />
+                                  <span>{rm.name}</span>
+                                  <span className="font-mono text-[10px] text-muted-foreground">({rm.code})</span>
+                                </span>
+                              ))}
+                            </div>
                           ) : (
-                            <span className="text-[11px] text-muted-foreground">Unassigned</span>
+                            <span className="text-[11px] text-muted-foreground italic">Unassigned</span>
                           )}
                         </td>
 
@@ -397,7 +392,7 @@ export default function RegionalOfficesPage() {
                 ) : (
                   <tr>
                     <td
-                      colSpan={6}
+                      colSpan={7}
                       className="px-4 py-8 text-center text-xs text-muted-foreground"
                     >
                       No regional offices found.
@@ -663,34 +658,43 @@ export default function RegionalOfficesPage() {
               </div>
             </div>
 
-            {/* RM Under this Regional Office (1-to-1) */}
+            {/* RM(s) Under this Regional Office */}
             {(() => {
-              const assignedRM = rms.find((r) => r.regionalOfficeId === viewingOffice.id)
+              const officeRMs = rms.filter((r) => r.regionalOfficeId === viewingOffice.id)
               return (
                 <div className="space-y-2">
-                  <span className="text-xs font-semibold text-foreground block">
-                    Assigned Regional Manager
-                  </span>
-                  {assignedRM ? (
-                    <div className="flex items-center justify-between rounded border border-border/60 bg-muted/20 p-2.5 text-xs">
-                      <div className="flex items-center gap-2">
-                        <UserRound className="size-4 text-primary" />
-                        <div>
-                          <span className="font-semibold text-foreground">{assignedRM.name}</span>
-                          <span className="font-mono text-[10px] text-muted-foreground ml-1.5">({assignedRM.code})</span>
-                          <div className="text-[11px] text-muted-foreground">{assignedRM.phone}</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground block">
+                      Assigned Regional Manager(s) ({officeRMs.length})
+                    </span>
+                  </div>
+                  {officeRMs.length > 0 ? (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {officeRMs.map((assignedRM) => (
+                        <div
+                          key={assignedRM.id}
+                          className="flex items-center justify-between rounded border border-border/60 bg-muted/20 p-2.5 text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <UserRound className="size-4 text-primary shrink-0" />
+                            <div>
+                              <span className="font-semibold text-foreground">{assignedRM.name}</span>
+                              <span className="font-mono text-[10px] text-muted-foreground ml-1.5">({assignedRM.code})</span>
+                              <div className="text-[11px] text-muted-foreground">{assignedRM.phone}</div>
+                            </div>
+                          </div>
+                          <div className="text-right text-[11px] text-muted-foreground">
+                            <div>Connected Depots:</div>
+                            <span className="font-semibold text-foreground">
+                              {assignedRM.depotNames?.join(", ") || assignedRM.depotIds?.join(", ")}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-right text-[11px] text-muted-foreground">
-                        <div>Connected Depots:</div>
-                        <span className="font-semibold text-foreground">
-                          {assignedRM.depotNames?.join(", ") || assignedRM.depotIds?.join(", ")}
-                        </span>
-                      </div>
+                      ))}
                     </div>
                   ) : (
                     <div className="rounded border border-dashed border-border/80 p-3 text-center text-xs text-muted-foreground">
-                      No Regional Manager assigned to this office.
+                      No Regional Managers assigned to this office.
                     </div>
                   )}
                 </div>

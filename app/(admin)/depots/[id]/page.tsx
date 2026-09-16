@@ -103,6 +103,14 @@ export default function SingleDepotPage() {
     return currentDepotStockItems.reduce((sum, item) => sum + item.quantity, 0)
   }, [currentDepotStockItems])
 
+  const totalStockValue = React.useMemo(() => {
+    return currentDepotStockItems.reduce((sum, item) => {
+      const prod = productCatalog.find((p) => p.id === item.productId)
+      const tp = prod?.tp ?? prod?.sellPrice ?? prod?.price ?? 0
+      return sum + (item.quantity * tp)
+    }, 0)
+  }, [currentDepotStockItems])
+
   const lowStockCount = React.useMemo(() => {
     return currentDepotStockItems.filter((item) => item.quantity <= item.minThreshold).length
   }, [currentDepotStockItems])
@@ -448,7 +456,7 @@ export default function SingleDepotPage() {
           </div>
 
           {/* Quick Metrics Bar */}
-          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border/60 pt-4 sm:grid-cols-3">
+          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border/60 pt-4 sm:grid-cols-4">
             <div className="rounded border border-border/60 bg-muted/30 p-3">
               <span className="text-[11px] font-medium text-muted-foreground">
                 Total Products
@@ -465,7 +473,15 @@ export default function SingleDepotPage() {
                 {totalQuantity.toLocaleString()}
               </p>
             </div>
-            <div className="col-span-2 rounded border border-border/60 bg-muted/30 p-3 sm:col-span-1">
+            <div className="rounded border border-primary/30 bg-primary/5 p-3">
+              <p className="text-xs font-medium text-primary">
+                Stock Value
+              </p>
+              <p className="mt-1 font-mono text-xl font-bold text-foreground">
+                ৳ {totalStockValue.toLocaleString()}
+              </p>
+            </div>
+            <div className="rounded border border-border/60 bg-muted/30 p-3">
               <span className="text-[11px] font-medium text-muted-foreground">
                 Low Stock
               </span>

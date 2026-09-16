@@ -8,6 +8,7 @@ import {
   Pencil,
   Trash2,
   MapPin,
+  MapPinned,
   Store,
   UserCheck,
   UserRound,
@@ -73,7 +74,8 @@ export default function CustomersPage() {
     phone: "",
     email: "",
     address: "",
-    areaId: areas[0]?.id || "1",
+    existingDue: "",
+    areaId: areas[0]?.id || "area-1",
     rmId: rms[0]?.id || "rm-1",
     amId: ams[0]?.id || "am-1",
     officerId: officers[0]?.id || "off-1",
@@ -222,7 +224,6 @@ export default function CustomersPage() {
   // Open Create Modal
   const handleOpenCreate = () => {
     const nextCodeNumber = customers.length + 1
-
     const defaultOfficer = officers[0]
 
     setFormData({
@@ -232,6 +233,7 @@ export default function CustomersPage() {
       phone: "",
       email: "",
       address: "",
+      existingDue: "",
       officerId: defaultOfficer?.id || "off-1",
       amId: defaultOfficer?.amId || "am-1",
       rmId: defaultOfficer?.rmId || "rm-1",
@@ -253,6 +255,7 @@ export default function CustomersPage() {
       phone: cust.phone,
       email: cust.email || "",
       address: cust.address,
+      existingDue: cust.outstandingBalance !== undefined ? String(cust.outstandingBalance) : "0",
       areaId: cust.areaId || matchingOfficer?.areaId || "",
       rmId: cust.rmId || matchingOfficer?.rmId || "",
       amId: cust.amId || matchingOfficer?.amId || "",
@@ -273,6 +276,7 @@ export default function CustomersPage() {
       email?: string
       address?: string
       officerId?: string
+      existingDue?: string
     } = {}
 
     if (!formData.code.trim()) {
@@ -320,6 +324,9 @@ export default function CustomersPage() {
     const rmName = assignedRM ? assignedRM.name : assignedOfficer.rmName
     const amName = assignedAM ? assignedAM.name : assignedOfficer.amName
     const officerName = assignedOfficer.name
+    const initialDue = Math.max(0, Number(formData.existingDue) || 0)
+    const territoryId = assignedOfficer.territoryId || ""
+    const territoryName = assignedOfficer.territoryName || ""
 
     if (editingCustomer) {
       updateCustomer(editingCustomer.id, {
@@ -331,12 +338,15 @@ export default function CustomersPage() {
         address: formData.address.trim(),
         areaId: assignedOfficer.areaId,
         areaName,
+        territoryId,
+        territoryName,
         rmId: assignedOfficer.rmId,
         rmName,
         amId: assignedOfficer.amId,
         amName,
         officerId: assignedOfficer.id,
         officerName,
+        outstandingBalance: formData.existingDue !== "" ? initialDue : editingCustomer.outstandingBalance || 0,
       })
       setEditingCustomer(null)
       showToast("Customer details updated successfully.")
@@ -350,6 +360,8 @@ export default function CustomersPage() {
         address: formData.address.trim(),
         areaId: assignedOfficer.areaId,
         areaName,
+        territoryId,
+        territoryName,
         rmId: assignedOfficer.rmId,
         rmName,
         amId: assignedOfficer.amId,
@@ -357,12 +369,16 @@ export default function CustomersPage() {
         officerId: assignedOfficer.id,
         officerName,
         creditLimit: 0,
-        outstandingBalance: 0,
+        outstandingBalance: initialDue,
         totalOrders: 0,
         totalSpent: 0,
       })
       setIsCreateOpen(false)
-      showToast("New Customer added successfully.")
+      showToast(
+        initialDue > 0
+          ? `New Customer added with ৳${initialDue.toLocaleString()} opening due balance.`
+          : "New Customer added successfully."
+      )
     }
     setFormErrors({})
     setFormError("")
@@ -812,6 +828,33 @@ export default function CustomersPage() {
                 )}
               </div>
 
+              {/* Existing Due / Opening Balance */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="custExistingDue" className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <CreditCard className="size-3.5 text-primary" />
+                    <span>Existing Due / Opening Balance (৳)</span>
+                  </Label>
+                  <span className="text-[10px] text-muted-foreground">Previous unpaid balance</span>
+                </div>
+                <Input
+                  id="custExistingDue"
+                  name="custExistingDue"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={formData.existingDue}
+                  onChange={(e) => {
+                    setFormData((prev) => ({ ...prev, existingDue: e.target.value }))
+                  }}
+                  placeholder="0 (e.g. 25000)"
+                  className="text-xs font-mono"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Specify any previous pending due amount for existing customers entering the system.
+                </p>
+              </div>
+
               {/* Assigned MPO (Medical Promotion Officer) */}
               <div className="space-y-1.5">
                 <Label htmlFor="custOfficer" className="text-xs font-medium text-foreground">
@@ -836,7 +879,7 @@ export default function CustomersPage() {
                 >
                   {officers.map((o) => (
                     <option key={o.id} value={o.id}>
-                      {o.name} ({o.code}) — Area: {o.areaName}
+                      {o.name} ({o.code}) — Territory: {o.territoryName || "-"} (Area: {o.areaName})
                     </option>
                   ))}
                 </select>
@@ -851,7 +894,18 @@ export default function CustomersPage() {
                   Auto-Connected Territory & Management
                 </span>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                  {/* Territory */}
+                  <div className="flex items-center gap-2 rounded border border-input/60 bg-background/80 px-2.5 py-1.5">
+                    <MapPinned className="size-3.5 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground leading-tight">Assigned Territory</p>
+                      <p className="font-medium text-foreground truncate">
+                        {selectedOfficerItem?.territoryName || "Unassigned"}
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Area */}
                   <div className="flex items-center gap-2 rounded border border-input/60 bg-background/80 px-2.5 py-1.5">
                     <MapPin className="size-3.5 text-primary shrink-0" />
@@ -865,7 +919,7 @@ export default function CustomersPage() {
 
                   {/* AM */}
                   <div className="flex items-center gap-2 rounded border border-input/60 bg-background/80 px-2.5 py-1.5">
-                    <UserRound className="size-3.5 text-primary shrink-0" />
+                    <UsersRound className="size-3.5 text-primary shrink-0" />
                     <div className="min-w-0">
                       <p className="text-[10px] text-muted-foreground leading-tight">Area Manager (AM)</p>
                       <p className="font-medium text-foreground truncate">
@@ -876,7 +930,7 @@ export default function CustomersPage() {
 
                   {/* RM */}
                   <div className="flex items-center gap-2 rounded border border-input/60 bg-background/80 px-2.5 py-1.5">
-                    <UserCheck className="size-3.5 text-primary shrink-0" />
+                    <UserRound className="size-3.5 text-primary shrink-0" />
                     <div className="min-w-0">
                       <p className="text-[10px] text-muted-foreground leading-tight">Regional Manager (RM)</p>
                       <p className="font-medium text-foreground truncate">
@@ -887,7 +941,7 @@ export default function CustomersPage() {
                 </div>
 
                 <p className="text-[10.5px] text-muted-foreground">
-                  Area Manager (AM), Regional Manager (RM), and Area are automatically connected from the selected MPO.
+                  Territory, Area, AM, and RM are automatically resolved from the assigned MPO.
                 </p>
               </div>
 

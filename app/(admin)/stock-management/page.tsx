@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Image from "next/image"
 import Link from "next/link"
 import {
   Boxes,
@@ -22,6 +23,7 @@ import {
   TrendingDown,
   TrendingUp,
   Store,
+  Printer,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -95,6 +97,8 @@ export default function StockManagementPage() {
   const [isAddStockOpen, setIsAddStockOpen] = React.useState(false)
   const [isTransferOpen, setIsTransferOpen] = React.useState(false)
   const [isReturnOpen, setIsReturnOpen] = React.useState(false)
+
+
   const [selectedDrilldownItem, setSelectedDrilldownItem] = React.useState<{
     depotId: string
     depotName: string
@@ -146,11 +150,17 @@ export default function StockManagementPage() {
       packSize: string
       quantity: number
       minThreshold: number
+      tp: number
+      stockValue: number
     }> = []
 
     depots.forEach((depot) => {
       const stockList = depotStocks[depot.id] || []
       stockList.forEach((item) => {
+        const prod = catalog.find((p) => p.id === item.productId)
+        const tp = prod?.tp ?? prod?.sellPrice ?? prod?.price ?? 0
+        const stockValue = item.quantity * tp
+
         list.push({
           depotId: depot.id,
           depotName: depot.name,
@@ -161,12 +171,14 @@ export default function StockManagementPage() {
           packSize: item.packSize,
           quantity: item.quantity,
           minThreshold: item.minThreshold,
+          tp,
+          stockValue,
         })
       })
     })
 
     return list
-  }, [depots, depotStocks])
+  }, [depots, depotStocks, catalog])
 
   // Filtered Depot Stock Items (RM & AM are locked to their assigned depot)
   const filteredDepotStock = React.useMemo(() => {
@@ -192,15 +204,14 @@ export default function StockManagementPage() {
     })
   }, [allDepotStockList, isRestrictedStaff, assignedDepot, selectedDepotFilter, searchStockQuery])
 
-  // Metrics (Reflect assigned depot items for RM/AM)
+  // Metrics: Now calculated directly from filteredDepotStock so when Bogura/Rangpur is filtered, total stock and value update accurately!
   const totalStockQuantity = React.useMemo(() => {
-    if (isRestrictedStaff && assignedDepot) {
-      return allDepotStockList
-        .filter((item) => item.depotId === assignedDepot.id)
-        .reduce((acc, curr) => acc + curr.quantity, 0)
-    }
-    return allDepotStockList.reduce((acc, curr) => acc + curr.quantity, 0)
-  }, [allDepotStockList, isRestrictedStaff, assignedDepot])
+    return filteredDepotStock.reduce((acc, curr) => acc + curr.quantity, 0)
+  }, [filteredDepotStock])
+
+  const totalStockValue = React.useMemo(() => {
+    return filteredDepotStock.reduce((acc, curr) => acc + curr.stockValue, 0)
+  }, [filteredDepotStock])
 
   const filteredTransfers = React.useMemo(() => {
     if (isRestrictedStaff && assignedDepot) {
@@ -666,7 +677,11 @@ export default function StockManagementPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <>
+      {/* ========================================================= */}
+      {/* 1. ON-SCREEN INTERACTIVE DASHBOARD (HIDDEN WHEN PRINTING) */}
+      {/* ========================================================= */}
+      <div className="space-y-5 print:hidden">
       {/* Toast */}
       {toastMessage && (
         <div className="fixed top-20 right-6 z-50 flex items-center gap-2 rounded-md border border-primary/30 bg-card px-4 py-2.5 text-xs font-medium text-foreground shadow-lg">
@@ -749,14 +764,30 @@ export default function StockManagementPage() {
         <Card className="border-border/80 bg-card shadow-xs">
           <CardHeader className="border-b border-border/70 p-4">
             <div className="flex flex-col gap-3.5">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <CardTitle className="text-sm font-semibold text-foreground">
                   {isRestrictedStaff && assignedDepot
                     ? `${assignedDepot.name} Inventory (${filteredDepotStock.length} items)`
                     : `Depot Inventory (${filteredDepotStock.length} items)`}
                 </CardTitle>
-                <div className="text-xs text-muted-foreground">
-                  Total Stock Qty: <strong className="text-foreground font-mono">{totalStockQuantity.toLocaleString()}</strong>
+                <div className="flex flex-wrap items-center gap-3 text-xs">
+                  <div className="text-muted-foreground">
+                    Total Stock Qty: <strong className="text-foreground font-mono">{totalStockQuantity.toLocaleString()}</strong>
+                  </div>
+                  <div className="rounded-md border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                    Stock Value: <strong className="font-mono font-bold text-foreground">৳ {totalStockValue.toLocaleString()}</strong>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.print()}
+                    className="h-7 cursor-pointer gap-1.5 border-border bg-background px-2.5 text-xs font-medium text-foreground hover:bg-muted shadow-xs"
+                    title="Print or Save stock statement as PDF"
+                  >
+                    <Printer className="size-3.5 text-primary" />
+                    <span>Print / Save PDF</span>
+                  </Button>
                 </div>
               </div>
 
@@ -818,6 +849,9 @@ export default function StockManagementPage() {
                       Pack Size
                     </th>
                     <th scope="col" className="px-4 py-3 text-right">
+                      TP (৳)
+                    </th>
+                    <th scope="col" className="px-4 py-3 text-right">
                       Available Stock
                     </th>
                   </tr>
@@ -858,6 +892,11 @@ export default function StockManagementPage() {
                             {item.packSize}
                           </td>
 
+                          {/* TP */}
+                          <td className="px-4 py-3 text-right font-mono font-medium text-muted-foreground">
+                            ৳ {item.tp.toLocaleString()}
+                          </td>
+
                           {/* Available Qty */}
                           <td className="px-4 py-3 text-right font-mono font-bold text-sm text-foreground">
                             {item.quantity.toLocaleString()}
@@ -867,7 +906,7 @@ export default function StockManagementPage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-xs text-muted-foreground">
+                      <td colSpan={7} className="px-4 py-8 text-center text-xs text-muted-foreground">
                         No inventory records match your criteria.
                       </td>
                     </tr>
@@ -1796,6 +1835,146 @@ export default function StockManagementPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 2. DEDICATED PRINTABLE STOCK STATEMENT DOCUMENT           */}
+      {/* (Rendered exclusively during window.print() / Save as PDF)*/}
+      {/* ========================================================= */}
+      <div id="stock-printable-report" className="hidden print:block bg-white text-slate-900 p-2">
+        {/* Company Branding Header */}
+        <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-4">
+          <div className="flex items-center gap-3">
+            <Image
+              src="/logo.jpeg"
+              alt="Eakin Animal Health Logo"
+              width={140}
+              height={40}
+              className="h-10 w-auto object-contain"
+              priority
+            />
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-slate-900 leading-tight">
+                Eakin Animal Health
+              </h1>
+            </div>
+          </div>
+          <div className="text-right text-xs text-slate-600 space-y-0.5">
+            <div className="font-bold text-slate-900 text-sm uppercase tracking-wide">Stock Statement</div>
+            <div>Date: {formatDateTime(new Date())}</div>
+          </div>
+        </div>
+
+        {/* Scope & Grand Totals Box */}
+        <div className="mb-4 grid grid-cols-2 gap-3 rounded border border-slate-300 bg-slate-50 p-3 text-xs">
+          <div>
+            <span className="font-semibold text-slate-500 uppercase tracking-wider block text-[10px]">
+              Depot / Scope:
+            </span>
+            <div className="font-bold text-slate-900 text-sm">
+              {selectedDepotFilter === "all"
+                ? "All Depots (Consolidated Stock)"
+                : depots.find((d) => d.id === selectedDepotFilter)?.name || "Selected Depot"}
+            </div>
+            {searchStockQuery && (
+              <div className="text-slate-500 font-mono text-[10px] mt-0.5">
+                Filtered Query: &ldquo;{searchStockQuery}&rdquo;
+              </div>
+            )}
+            <div className="text-slate-500 text-[11px] mt-0.5">
+              Total SKU Items: <strong>{filteredDepotStock.length}</strong>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-end justify-center text-right border-l border-slate-300 pl-3">
+            <div className="text-xs text-slate-700">
+              Total Stock Quantity: <strong className="font-mono text-sm font-bold text-slate-900">{totalStockQuantity.toLocaleString()}</strong> units
+            </div>
+            <div className="mt-1 rounded bg-emerald-50 border border-emerald-300 px-2.5 py-1 text-xs text-emerald-950">
+              Total Stock Value: <strong className="font-mono text-sm font-bold text-emerald-800">৳ {totalStockValue.toLocaleString()}</strong>
+            </div>
+          </div>
+        </div>
+
+        {/* Stock Items Table */}
+        <table className="w-full text-left text-xs border border-slate-300 border-collapse">
+          <thead className="border-b-2 border-slate-400 bg-slate-100 text-[10px] font-bold tracking-wider text-slate-800 uppercase">
+            <tr>
+              <th scope="col" className="w-10 px-2.5 py-2 text-center border-r border-slate-300">
+                SL
+              </th>
+              <th scope="col" className="px-2.5 py-2 border-r border-slate-300">
+                Depot
+              </th>
+              <th scope="col" className="px-2.5 py-2 border-r border-slate-300">
+                Product Code
+              </th>
+              <th scope="col" className="px-2.5 py-2 border-r border-slate-300">
+                Product Name
+              </th>
+              <th scope="col" className="px-2.5 py-2 border-r border-slate-300">
+                Pack Size
+              </th>
+              <th scope="col" className="px-2.5 py-2 text-right border-r border-slate-300">
+                TP (৳)
+              </th>
+              <th scope="col" className="px-2.5 py-2 text-right">
+                Stock Qty
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {filteredDepotStock.length > 0 ? (
+              filteredDepotStock.map((item, index) => (
+                <tr key={`${item.depotId}-${item.productId}`} className="even:bg-slate-50/70">
+                  <td className="px-2.5 py-1.5 text-center text-slate-500 border-r border-slate-200 font-medium text-[11px]">
+                    {index + 1}
+                  </td>
+                  <td className="px-2.5 py-1.5 font-semibold text-slate-900 border-r border-slate-200 text-[11px]">
+                    {item.depotName}
+                  </td>
+                  <td className="px-2.5 py-1.5 font-mono text-slate-700 border-r border-slate-200 text-[10px]">
+                    {item.productCode}
+                  </td>
+                  <td className="px-2.5 py-1.5 font-medium text-slate-900 border-r border-slate-200 text-[11px]">
+                    {item.productName}
+                  </td>
+                  <td className="px-2.5 py-1.5 text-slate-600 font-mono text-[10px] border-r border-slate-200">
+                    {item.packSize}
+                  </td>
+                  <td className="px-2.5 py-1.5 text-right font-mono text-slate-800 border-r border-slate-200 text-[11px]">
+                    ৳ {item.tp.toLocaleString()}
+                  </td>
+                  <td className="px-2.5 py-1.5 text-right font-mono font-bold text-slate-900 text-[11px]">
+                    {item.quantity.toLocaleString()}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
+                  No stock inventory records to print.
+                </td>
+              </tr>
+            )}
+          </tbody>
+          {filteredDepotStock.length > 0 && (
+            <tfoot className="border-t-2 border-slate-400 bg-slate-100 font-bold text-slate-900">
+              <tr>
+                <td colSpan={5} className="px-3 py-2 text-right uppercase tracking-wider text-[10px]">
+                  Grand Total Summary:
+                </td>
+                <td className="px-2.5 py-2 text-right font-mono text-slate-900 text-xs">
+                  Value: ৳ {totalStockValue.toLocaleString()}
+                </td>
+                <td className="px-2.5 py-2 text-right font-mono text-slate-900 text-xs">
+                  {totalStockQuantity.toLocaleString()} units
+                </td>
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </>
   )
 }

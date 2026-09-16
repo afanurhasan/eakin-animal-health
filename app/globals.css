@@ -119,11 +119,114 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+  }
+  button, [role="button"], a {
+    cursor: pointer;
+  }
+  button:disabled, [disabled], [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
+/* ========================================================= */
+/* GLOBAL PRINT MEDIA OPTIMIZATIONS                          */
+/* ========================================================= */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 10mm 10mm 10mm;
+  }
+
+  /* Reset body and hide app chrome */
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 10pt !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide app navigation, sidebars, headers, floating buttons, and all screen-only UI */
+  aside,
+  header,
+  nav,
+  .print\:hidden,
+  .no-print,
+  [data-slot="sidebar"],
+  button:not(.printable-button) {
+    display: none !important;
+  }
+
+  /* Ensure main layout container does not clip or restrict print width */
+  main,
+  main > div {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Dedicated printable report container */
+  #stock-printable-report {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /* Reset all modal overlays so document prints cleanly full-width */
+  .fixed.inset-0,
+  [role="dialog"] {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Remove modal card styling, borders, scrolls and shadows */
+  .printable-document,
+  .printable-sheet,
+  [role="dialog"] > div,
+  .max-w-4xl,
+  .max-w-3xl,
+  .max-w-2xl {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  /* Prevent page-break issues inside table rows */
+  tr {
+    page-break-inside: avoid !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
 }

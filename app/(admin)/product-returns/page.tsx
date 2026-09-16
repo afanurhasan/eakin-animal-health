@@ -449,7 +449,8 @@ export default function ProductReturnsPage() {
   }, [returns])
 
   return (
-    <div className="space-y-6 pb-12">
+    <>
+      <div className={`space-y-6 pb-12 ${selectedSlip ? "print:hidden" : ""}`}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-medium text-white shadow-xl animate-in fade-in slide-in-from-bottom-5">
@@ -476,7 +477,7 @@ export default function ProductReturnsPage() {
         <div className="flex items-center gap-3">
           <Button
             onClick={() => openAddModal()}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition-all flex items-center gap-2"
+            className="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition-all flex items-center gap-2"
           >
             <Plus className="h-4 w-4" />
             Process Return
@@ -930,7 +931,7 @@ export default function ProductReturnsPage() {
                             <tr>
                               <th className="py-2.5 px-3">Product Name & Code</th>
                               <th className="py-2.5 px-3">Pack Size</th>
-                              <th className="py-2.5 px-3 text-right">Price (৳)</th>
+                              <th className="py-2.5 px-3 text-right">TP (৳)</th>
                               <th className="py-2.5 px-3 text-center">Returnable Limit</th>
                               <th className="py-2.5 px-3 text-center w-32">Return Qty</th>
                               <th className="py-2.5 px-3 text-right font-bold text-amber-800">
@@ -1097,15 +1098,20 @@ export default function ProductReturnsPage() {
           </div>
         </div>
       )}
+      </div>
 
       {/* ========================================================================= */}
       {/* VIEW RETURN SLIP MODAL */}
       {/* ========================================================================= */}
       {selectedSlip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="relative w-full max-w-2xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto print:static print:inset-auto print:p-0 print:bg-white print:overflow-visible"
+        >
+          <div className="relative w-full max-w-2xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8 print:border-none print:shadow-none print:m-0 print:max-w-none print:p-0">
+            {/* Header (Hidden on print) */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4 print:hidden">
               <div className="flex items-center gap-2">
                 <RotateCcw className="h-5 w-5 text-amber-600" />
                 <h3 className="text-base font-bold text-slate-900">Product Return Voucher</h3>
@@ -1115,7 +1121,7 @@ export default function ProductReturnsPage() {
                   size="sm"
                   variant="outline"
                   onClick={() => window.print()}
-                  className="h-8 gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-100 text-xs"
+                  className="h-8 gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-100 text-xs cursor-pointer"
                 >
                   <Printer className="h-3.5 w-3.5" />
                   Print
@@ -1123,15 +1129,15 @@ export default function ProductReturnsPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedSlip(null)}
-                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
             </div>
 
-            {/* Slip Body */}
-            <div className="p-6 space-y-6">
+            {/* Slip Body (Printed cleanly) */}
+            <div className="p-6 space-y-6 print:p-3 text-slate-900 bg-white">
               {/* Top Branding */}
               <div className="flex items-center justify-between border-b border-slate-200 pb-4 gap-4">
                 <div className="flex items-center gap-3">
@@ -1147,7 +1153,7 @@ export default function ProductReturnsPage() {
                   </div>
                   <div>
                     <h1 className="text-base font-bold tracking-tight text-slate-900">
-                      Eakin Animal Health Ltd.
+                      Eakin Animal Health
                     </h1>
                   </div>
                 </div>
@@ -1192,7 +1198,7 @@ export default function ProductReturnsPage() {
                       <tr>
                         <th className="py-2.5 px-3">Product Name</th>
                         <th className="py-2.5 px-3">Pack Size</th>
-                        <th className="py-2.5 px-3 text-right">Unit Price</th>
+                        <th className="py-2.5 px-3 text-right">TP (৳)</th>
                         <th className="py-2.5 px-3 text-center">Returned Qty</th>
                         <th className="py-2.5 px-3 text-right font-bold text-amber-800">
                           Total Value
@@ -1246,13 +1252,13 @@ export default function ProductReturnsPage() {
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end border-t border-slate-100 bg-slate-50 px-6 py-3">
+            {/* Footer (Hidden on print) */}
+            <div className="flex items-center justify-end border-t border-slate-100 bg-slate-50 px-6 py-3 print:hidden">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setSelectedSlip(null)}
-                className="border-slate-300 text-slate-700 hover:bg-slate-100 text-xs"
+                className="border-slate-300 text-slate-700 hover:bg-slate-100 text-xs cursor-pointer"
               >
                 Close
               </Button>
@@ -1260,6 +1266,6 @@ export default function ProductReturnsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

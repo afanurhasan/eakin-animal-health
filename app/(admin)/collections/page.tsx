@@ -34,20 +34,23 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import {
-  initialCollections,
-  initialOrders,
-  initialCustomers,
   type CollectionItem,
   type InvoiceAllocation,
   type Order,
   type CustomerItem,
 } from "@/lib/mock-data"
+import { useAppState } from "@/lib/store"
 import { formatDate, parseDateToTimestamp } from "@/lib/utils"
 
 export default function CollectionsPage() {
-  const [collections, setCollections] = React.useState<CollectionItem[]>(initialCollections)
-  const [orders, setOrders] = React.useState<Order[]>(initialOrders)
-  const [customers, setCustomers] = React.useState<CustomerItem[]>(initialCustomers)
+  const {
+    collections,
+    orders,
+    customers,
+    addCollection,
+    updateOrder,
+    updateCustomer,
+  } = useAppState()
 
   // Filters (Search + Customer-wise)
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -64,10 +67,11 @@ export default function CollectionsPage() {
     setTimeout(() => setToastMessage(null), 3000)
   }
 
-  // Helper to get a customer's live current outstanding due across approved orders
-  const getCustomerCurrentDue = React.useCallback(
+  // Helper to get breakdown of customer due: totalDue, openingDue, orderDue
+  const getCustomerDueBreakdown = React.useCallback(
     (customerId: string) => {
-      return orders
+      const cust = customers.find((c) => c.id === customerId)
+      const orderDue = orders
         .filter((o) => o.customerId === customerId && o.status === "Approved")
         .reduce((sum, o) => {
           const paid = o.paidAmount || 0
@@ -76,8 +80,18 @@ export default function CollectionsPage() {
           const due = typeof o.dueAmount === "number" ? o.dueAmount : Math.max(0, effectiveTotal - paid)
           return sum + due
         }, 0)
+      const totalDue = Math.max(cust?.outstandingBalance || 0, orderDue)
+      const openingDue = Math.max(0, totalDue - orderDue)
+      return { totalDue, openingDue, orderDue }
     },
-    [orders]
+    [orders, customers]
+  )
+
+  const getCustomerCurrentDue = React.useCallback(
+    (customerId: string) => {
+      return getCustomerDueBreakdown(customerId).totalDue
+    },
+    [getCustomerDueBreakdown]
   )
 
   // Form State for Add Collection (Search-Based Customer Workflow)
@@ -86,6 +100,7 @@ export default function CollectionsPage() {
   const [formAmount, setFormAmount] = React.useState("")
   const [formDate, setFormDate] = React.useState("2026-09-05")
   const [formError, setFormError] = React.useState("")
+  const [amountExceededWarning, setAmountExceededWarning] = React.useState(false)
 
   // Reset form when modal opens
   const openAddModal = (prefillCustomerId?: string) => {
@@ -94,6 +109,7 @@ export default function CollectionsPage() {
     setFormAmount("")
     setFormDate("2026-09-05")
     setFormError("")
+    setAmountExceededWarning(false)
     setIsAddModalOpen(true)
   }
 
@@ -121,6 +137,7 @@ export default function CollectionsPage() {
     setCustomerSearchQuery("")
     setFormAmount("")
     setFormError("")
+    setAmountExceededWarning(false)
   }
 
   // Handle resetting/changing selected customer
@@ -129,6 +146,66 @@ export default function CollectionsPage() {
     setCustomerSearchQuery("")
     setFormAmount("")
     setFormError("")
+    setAmountExceededWarning(false)
+  }
+
+  // Collection Amount Input Change Handler - Strictly validates against Total Due
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value
+    setFormAmount(rawVal)
+
+    if (rawVal === "") {
+      setFormError("")
+      setAmountExceededWarning(false)
+      return
+    }
+
+    const numVal = parseFloat(rawVal)
+    if (isNaN(numVal)) {
+      setFormError("")
+      setAmountExceededWarning(false)
+      return
+    }
+
+    if (numVal < 0) {
+      setFormError("Collection amount cannot be negative.")
+      setAmountExceededWarning(true)
+      return
+    }
+
+    if (selectedCustomer) {
+      const { totalDue } = getCustomerDueBreakdown(selectedCustomer.id)
+      if (totalDue > 0 && numVal > totalDue) {
+        setAmountExceededWarning(true)
+        setFormError(
+          `Amount exceeded! ৳${numVal.toLocaleString()} exceeds customer's Total Due of ৳${totalDue.toLocaleString()} (by ৳${(numVal - totalDue).toLocaleString()}). Submit is blocked.`
+        )
+        return
+      }
+    }
+
+    setAmountExceededWarning(false)
+    setFormError("")
+  }
+
+  // Prevent keyboard actions like ArrowUp exceeding totalDue or negative signs
+  const handleAmountKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (selectedCustomer) {
+      const { totalDue } = getCustomerDueBreakdown(selectedCustomer.id)
+      const currentNum = parseFloat(formAmount) || 0
+
+      if (e.key === "ArrowUp" && currentNum >= totalDue) {
+        e.preventDefault()
+        setFormAmount(String(totalDue))
+        setAmountExceededWarning(true)
+        return
+      }
+
+      if (["+", "-", "e", "E"].includes(e.key)) {
+        e.preventDefault()
+        return
+      }
+    }
   }
 
   // Get customer's approved unpaid/partially-paid orders (sorted by date ascending for strict chronological FIFO)
@@ -155,20 +232,48 @@ export default function CollectionsPage() {
       })
   }, [orders, formCustomerId])
 
-  // Real-time FIFO Allocation computation (chronological earliest first)
+  // Real-time FIFO Allocation computation (Existing Due first, then chronological earliest orders)
   const liveAllocations = React.useMemo(() => {
     const enteredAmount = parseFloat(formAmount) || 0
-    if (enteredAmount <= 0 || customerUnpaidOrders.length === 0) return []
+    if (enteredAmount <= 0 || !formCustomerId) return []
+
+    const { totalDue, openingDue } = getCustomerDueBreakdown(formCustomerId)
+    if (totalDue > 0 && enteredAmount > totalDue) {
+      return []
+    }
 
     let remainingToAllocate = enteredAmount
+
     const allocationResult: Array<{
-      order: (typeof customerUnpaidOrders)[0]
+      id: string
+      orderCode: string
+      dateText: string
       allocated: number
       previousDue: number
       newRemainingDue: number
       isFullyPaid: boolean
+      isOpeningBalance?: boolean
     }> = []
 
+    // 1. Allocate against Existing Due (Opening Balance) first
+    if (openingDue > 0) {
+      const allocated = Math.min(remainingToAllocate, openingDue)
+      const newRemainingDue = Math.max(0, openingDue - allocated)
+      remainingToAllocate -= allocated
+
+      allocationResult.push({
+        id: "opening-balance",
+        orderCode: "EXISTING-DUE",
+        dateText: "Opening Balance",
+        allocated,
+        previousDue: openingDue,
+        newRemainingDue,
+        isFullyPaid: newRemainingDue === 0,
+        isOpeningBalance: true,
+      })
+    }
+
+    // 2. Allocate chronologically against customer's unpaid approved orders
     for (const order of customerUnpaidOrders) {
       if (remainingToAllocate <= 0) break
 
@@ -178,23 +283,26 @@ export default function CollectionsPage() {
       remainingToAllocate -= allocated
 
       allocationResult.push({
-        order,
+        id: order.id,
+        orderCode: order.code,
+        dateText: order.date,
         allocated,
         previousDue: prevDue,
         newRemainingDue,
         isFullyPaid: newRemainingDue === 0,
+        isOpeningBalance: false,
       })
     }
 
     return allocationResult
-  }, [formAmount, customerUnpaidOrders])
+  }, [formAmount, formCustomerId, customerUnpaidOrders, getCustomerDueBreakdown])
 
   // Handle Record Collection Submit
   const handleRecordCollection = (e: React.FormEvent) => {
     e.preventDefault()
     setFormError("")
 
-    if (!formCustomerId) {
+    if (!formCustomerId || !selectedCustomer) {
       setFormError("Please search and select a customer to record collection.")
       return
     }
@@ -210,16 +318,42 @@ export default function CollectionsPage() {
       return
     }
 
-    if (customerUnpaidOrders.length === 0) {
-      setFormError("This customer has no outstanding unpaid invoices.")
+    const { totalDue, openingDue } = getCustomerDueBreakdown(formCustomerId)
+
+    if (totalDue <= 0) {
+      setFormError("This customer currently has zero outstanding due balance.")
       return
     }
 
-    // Perform strict chronological FIFO allocation against customer's unpaid orders (oldest first)
+    if (numAmount > totalDue) {
+      setAmountExceededWarning(true)
+      setFormError(
+        `Amount Exceeded! You entered ৳${numAmount.toLocaleString()}, but total due is ৳${totalDue.toLocaleString()} (exceeded by ৳${(numAmount - totalDue).toLocaleString()}). Submit is blocked.`
+      )
+      return
+    }
+
     let remainingToAllocate = numAmount
     const createdAllocations: InvoiceAllocation[] = []
-    const updatedAllocationsMap = new Map<string, { newPaid: number; newDue: number }>()
 
+    // 1. First allocate against Opening Balance / Existing Due if present
+    if (openingDue > 0) {
+      const allocToOpening = Math.min(remainingToAllocate, openingDue)
+      const remainingOpening = openingDue - allocToOpening
+      remainingToAllocate -= allocToOpening
+
+      createdAllocations.push({
+        orderId: "opening-balance",
+        orderCode: "EXISTING-DUE",
+        orderDate: "Opening Balance",
+        originalGrandTotal: openingDue,
+        previousDue: openingDue,
+        allocatedAmount: allocToOpening,
+        remainingDue: remainingOpening,
+      })
+    }
+
+    // 2. Perform chronological FIFO allocation against customer's unpaid orders (oldest first)
     for (const order of customerUnpaidOrders) {
       if (remainingToAllocate <= 0) break
 
@@ -228,11 +362,6 @@ export default function CollectionsPage() {
       const newPaid = (order.paidAmount || 0) + allocated
       const newDue = Math.max(0, currentDue - allocated)
       remainingToAllocate -= allocated
-
-      updatedAllocationsMap.set(order.id, {
-        newPaid,
-        newDue,
-      })
 
       createdAllocations.push({
         orderId: order.id,
@@ -243,55 +372,42 @@ export default function CollectionsPage() {
         allocatedAmount: allocated,
         remainingDue: newDue,
       })
+
+      // Update order payment status in store
+      updateOrder(order.id, {
+        paidAmount: newPaid,
+        dueAmount: newDue,
+        paymentStatus: (newDue === 0 ? "Paid" : "Partially Paid") as Order["paymentStatus"],
+      })
     }
 
-    // Apply the allocations to the orders state
-    const updatedOrders = orders.map((order) => {
-      if (updatedAllocationsMap.has(order.id)) {
-        const alloc = updatedAllocationsMap.get(order.id)!
-        return {
-          ...order,
-          paidAmount: alloc.newPaid,
-          dueAmount: alloc.newDue,
-          paymentStatus: (alloc.newDue === 0 ? "Paid" : "Partially Paid") as Order["paymentStatus"],
-        }
-      }
-      return order
+    // 3. Update customer outstanding balance in store
+    const currentBal = selectedCustomer.outstandingBalance || 0
+    const newBal = Math.max(0, currentBal - numAmount)
+    updateCustomer(selectedCustomer.id, {
+      outstandingBalance: newBal,
     })
 
-    // Update customer outstanding balance
-    const updatedCustomers = customers.map((c) => {
-      if (c.id === formCustomerId) {
-        const currentBal = c.outstandingBalance || 0
-        return {
-          ...c,
-          outstandingBalance: Math.max(0, currentBal - numAmount),
-        }
-      }
-      return c
-    })
+    // 4. Create and record collection entry in store
+    const dateFormatted = `${formatDate(formDate)}, ${new Date().toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    })}`
 
-    // Generate new collection record
-    const nextColNumber = collections.length + 1
-    const newCollectionCode = `COL-2026-${String(nextColNumber).padStart(3, "0")}`
-
-    const newCollectionItem: CollectionItem = {
-      id: `col-${Date.now()}`,
-      code: newCollectionCode,
-      customerId: selectedCustomer?.id || formCustomerId,
-      customerCode: selectedCustomer?.code || "CUST",
-      customerName: selectedCustomer?.name || "Customer",
-      shopName: selectedCustomer?.shopName || "Shop",
-      date: `${formatDate(formDate)}, ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`,
+    addCollection({
+      customerId: selectedCustomer.id,
+      customerCode: selectedCustomer.code,
+      customerName: selectedCustomer.name,
+      shopName: selectedCustomer.shopName,
       amount: numAmount,
       allocations: createdAllocations,
-    }
+      date: dateFormatted,
+    })
 
-    setOrders(updatedOrders)
-    setCustomers(updatedCustomers)
-    setCollections([newCollectionItem, ...collections])
     setIsAddModalOpen(false)
-    showToast(`Payment of ৳${numAmount.toLocaleString()} recorded successfully for ${selectedCustomer?.name}.`)
+    showToast(
+      `Payment of ৳${numAmount.toLocaleString()} recorded successfully for ${selectedCustomer.name}.`
+    )
   }
 
   // Filtered collections (Customer-wise + Search)
@@ -314,20 +430,20 @@ export default function CollectionsPage() {
     })
   }, [collections, searchQuery, selectedCustomerFilter])
 
-  // Aggregate Metrics: Total Sales, Total Collections, Total Due (Strictly Consistent: Total Due = Total Sales - Total Collections)
+  // Aggregate Metrics: Total Sales, Total Collections, Total Due (Sum of all customer balances including opening due)
   const metrics = React.useMemo(() => {
     const totalSales = orders
       .filter((o) => o.status === "Approved")
       .reduce((sum, o) => sum + o.grandTotal, 0)
     const totalCollected = collections.reduce((sum, c) => sum + c.amount, 0)
-    const totalDue = Math.max(0, totalSales - totalCollected)
+    const totalDue = customers.reduce((sum, c) => sum + (c.outstandingBalance || 0), 0)
     return {
       totalSales,
       totalCollected,
       totalDue,
       totalTransactions: collections.length,
     }
-  }, [orders, collections])
+  }, [orders, collections, customers])
 
   // Lookup full customer details for receipt modal
   const receiptCustomer = React.useMemo(() => {
@@ -336,7 +452,8 @@ export default function CollectionsPage() {
   }, [selectedReceipt, customers])
 
   return (
-    <div className="space-y-6 pb-12">
+    <>
+      <div className={`space-y-6 pb-12 ${selectedReceipt ? "print:hidden" : ""}`}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-lg bg-emerald-700 px-4 py-3 text-sm font-medium text-white shadow-xl animate-in fade-in slide-in-from-bottom-5">
@@ -360,7 +477,7 @@ export default function CollectionsPage() {
         <div className="flex items-center gap-3">
           <Button
             onClick={() => openAddModal()}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition-all flex items-center gap-2"
+            className="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm transition-all flex items-center gap-2"
           >
             <Plus className="h-4 w-4" />
             Record Collection
@@ -539,19 +656,37 @@ export default function CollectionsPage() {
                     </td>
                     <td className="py-3.5 px-4">
                       <div className="flex flex-wrap gap-1.5 max-w-xs">
-                        {col.allocations.map((alloc) => (
-                          <span
-                            key={alloc.orderId}
-                            className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700 border border-slate-200 font-mono"
-                            title={`Allocated ৳${alloc.allocatedAmount.toLocaleString()} to ${alloc.orderCode} (Remaining Due: ৳${alloc.remainingDue.toLocaleString()})`}
-                          >
-                            <FileText className="h-3 w-3 text-slate-400" />
-                            {alloc.orderCode}:{" "}
-                            <span className="font-bold text-emerald-600">
-                              ৳{alloc.allocatedAmount.toLocaleString()}
+                        {col.allocations.map((alloc) => {
+                          const isOpening =
+                            alloc.orderId === "opening-balance" || alloc.orderCode === "EXISTING-DUE"
+                          return (
+                            <span
+                              key={alloc.orderId}
+                              className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-mono border ${
+                                isOpening
+                                  ? "bg-amber-50 text-amber-900 border-amber-200"
+                                  : "bg-slate-100 text-slate-700 border-slate-200"
+                              }`}
+                              title={`Allocated ৳${alloc.allocatedAmount.toLocaleString()} to ${
+                                isOpening ? "Existing Due (Opening Balance)" : alloc.orderCode
+                              } (Remaining Due: ৳${alloc.remainingDue.toLocaleString()})`}
+                            >
+                              {isOpening ? (
+                                <AlertCircle className="h-3 w-3 text-amber-600 shrink-0" />
+                              ) : (
+                                <FileText className="h-3 w-3 text-slate-400 shrink-0" />
+                              )}
+                              <span>{isOpening ? "Existing Due:" : `${alloc.orderCode}:`}</span>
+                              <span
+                                className={`font-bold ${
+                                  isOpening ? "text-amber-800" : "text-emerald-600"
+                                }`}
+                              >
+                                ৳{alloc.allocatedAmount.toLocaleString()}
+                              </span>
                             </span>
-                          </span>
-                        ))}
+                          )
+                        })}
                       </div>
                     </td>
                     <td className="py-3.5 px-4 text-center">
@@ -641,7 +776,7 @@ export default function CollectionsPage() {
                           </div>
                         ) : (
                           matchingSearchCustomers.map((cust) => {
-                            const due = getCustomerCurrentDue(cust.id)
+                            const { totalDue, openingDue, orderDue } = getCustomerDueBreakdown(cust.id)
                             return (
                               <button
                                 key={cust.id}
@@ -666,8 +801,18 @@ export default function CollectionsPage() {
                                     Outstanding Due
                                   </span>
                                   <span className="font-bold text-amber-700 font-mono text-sm">
-                                    ৳{due.toLocaleString()}
+                                    ৳{totalDue.toLocaleString()}
                                   </span>
+                                  {openingDue > 0 && orderDue > 0 && (
+                                    <span className="text-[10px] text-slate-500 block font-mono">
+                                      Existing: ৳{openingDue.toLocaleString()} • Inv: ৳{orderDue.toLocaleString()}
+                                    </span>
+                                  )}
+                                  {openingDue > 0 && orderDue === 0 && (
+                                    <span className="text-[10px] text-amber-700 font-medium block">
+                                      Existing Due Only
+                                    </span>
+                                  )}
                                 </div>
                               </button>
                             )
@@ -679,138 +824,284 @@ export default function CollectionsPage() {
                 </div>
               ) : (
                 /* Customer Selected Snapshot & Unpaid Invoices */
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4 space-y-3 text-xs">
-                  <div className="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                        Customer Selected
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleResetCustomer}
-                      className="h-7 text-xs text-slate-600 hover:text-emerald-700 hover:bg-emerald-100/60 flex items-center gap-1"
-                    >
-                      <RefreshCw className="h-3 w-3" />
-                      Change Customer
-                    </Button>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <span className="text-slate-500 block uppercase font-medium">Customer Details</span>
-                      <span className="font-bold text-slate-900 text-sm mt-0.5 block">
-                        {selectedCustomer.name}
-                      </span>
-                      <span className="text-slate-500 font-mono text-[11px]">
-                        {selectedCustomer.shopName} ({selectedCustomer.code}) • {selectedCustomer.phone}
-                      </span>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="text-slate-500 block uppercase font-medium">
-                        Current Outstanding Due
-                      </span>
-                      <span className="text-xl font-extrabold text-amber-700 font-mono mt-0.5 block">
-                        ৳{getCustomerCurrentDue(selectedCustomer.id).toLocaleString()}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Unpaid Invoices List */}
-                  <div className="pt-2 border-t border-emerald-200/60">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-slate-700">
-                        Unpaid / Partially-Paid Invoices ({customerUnpaidOrders.length})
-                      </span>
-                      <span className="text-xs text-slate-400">
-                        Settled in chronological FIFO order
-                      </span>
-                    </div>
-
-                    {customerUnpaidOrders.length === 0 ? (
-                      <div className="rounded-md bg-white p-3 text-center text-xs text-slate-500 border border-slate-200">
-                        No outstanding unpaid invoices found for this customer.
+                (() => {
+                  const breakdown = getCustomerDueBreakdown(selectedCustomer.id)
+                  return (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4 space-y-3 text-xs">
+                      <div className="flex items-center justify-between border-b border-emerald-200/60 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                            Customer Selected
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleResetCustomer}
+                          className="h-7 text-xs text-slate-600 hover:text-emerald-700 hover:bg-emerald-100/60 flex items-center gap-1"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                          Change Customer
+                        </Button>
                       </div>
-                    ) : (
-                      <div className="max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-white">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
-                            <tr>
-                              <th className="py-2 px-3">Invoice ID</th>
-                              <th className="py-2 px-3">Date</th>
-                              <th className="py-2 px-3 text-right">Grand Total</th>
-                              <th className="py-2 px-3 text-right">Paid So Far</th>
-                              <th className="py-2 px-3 text-right font-bold text-amber-700">
-                                Current Due
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {customerUnpaidOrders.map((ord) => (
-                              <tr key={ord.id} className="hover:bg-slate-50">
-                                <td className="py-2 px-3 font-mono font-medium text-slate-800">
-                                  {ord.code}
-                                </td>
-                                <td className="py-2 px-3 text-slate-500 whitespace-nowrap">
-                                  {ord.date}
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono">
-                                  ৳{ord.grandTotal.toLocaleString()}
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono text-slate-600">
-                                  ৳{(ord.paidAmount || 0).toLocaleString()}
-                                </td>
-                                <td className="py-2 px-3 text-right font-mono font-bold text-amber-700">
-                                  ৳{ord.currentDue.toLocaleString()}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <span className="text-slate-500 block uppercase font-medium">Customer Details</span>
+                          <span className="font-bold text-slate-900 text-sm mt-0.5 block">
+                            {selectedCustomer.name}
+                          </span>
+                          <span className="text-slate-500 font-mono text-[11px]">
+                            {selectedCustomer.shopName} ({selectedCustomer.code}) • {selectedCustomer.phone}
+                          </span>
+                        </div>
+
+                        <div className="text-right">
+                          <span className="text-slate-500 block uppercase font-medium">
+                            Total Outstanding Due
+                          </span>
+                          <span className="text-xl font-extrabold text-amber-700 font-mono mt-0.5 block">
+                            ৳{breakdown.totalDue.toLocaleString()}
+                          </span>
+                          {breakdown.openingDue > 0 && (
+                            <span className="text-[11px] text-amber-800 font-medium block">
+                              (Existing: ৳{breakdown.openingDue.toLocaleString()} + Invoices: ৳{breakdown.orderDue.toLocaleString()})
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
+
+                      {/* Existing Due Banner if customer has opening due */}
+                      {breakdown.openingDue > 0 && (
+                        <div className="rounded-md bg-amber-50 border border-amber-200 p-2.5 flex items-start gap-2 text-xs text-amber-900">
+                          <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <div className="font-semibold flex items-center justify-between">
+                              <span>Existing Due (Opening Balance): ৳{breakdown.openingDue.toLocaleString()}</span>
+                              <span className="rounded bg-amber-200/70 px-1.5 py-0.5 text-[10px] uppercase font-bold text-amber-900">
+                                Settled 1st
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-amber-800 mt-0.5">
+                              This customer has an initial due from account creation. Payment will automatically settle this existing due first before invoice orders.
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Unpaid Invoices List */}
+                      <div className="pt-2 border-t border-emerald-200/60">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-slate-700">
+                            Unpaid / Partially-Paid Invoices ({customerUnpaidOrders.length})
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            Settled in chronological FIFO order
+                          </span>
+                        </div>
+
+                        {customerUnpaidOrders.length === 0 ? (
+                          <div className="rounded-md bg-white p-3 text-center text-xs border border-slate-200">
+                            {breakdown.openingDue > 0 ? (
+                              <div className="flex items-center justify-center gap-2 text-emerald-700 font-medium">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                                <span>
+                                  No sales order invoices yet. You can directly collect against their <strong>Existing Due (৳{breakdown.openingDue.toLocaleString()})</strong>.
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-500">
+                                No outstanding unpaid invoices or dues found for this customer.
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="max-h-40 overflow-y-auto rounded-md border border-slate-200 bg-white">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
+                                <tr>
+                                  <th className="py-2 px-3">Invoice ID</th>
+                                  <th className="py-2 px-3">Date</th>
+                                  <th className="py-2 px-3 text-right">Grand Total</th>
+                                  <th className="py-2 px-3 text-right">Paid So Far</th>
+                                  <th className="py-2 px-3 text-right font-bold text-amber-700">
+                                    Current Due
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {customerUnpaidOrders.map((ord) => (
+                                  <tr key={ord.id} className="hover:bg-slate-50">
+                                    <td className="py-2 px-3 font-mono font-medium text-slate-800">
+                                      {ord.code}
+                                    </td>
+                                    <td className="py-2 px-3 text-slate-500 whitespace-nowrap">
+                                      {ord.date}
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono">
+                                      ৳{ord.grandTotal.toLocaleString()}
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-600">
+                                      ৳{(ord.paidAmount || 0).toLocaleString()}
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono font-bold text-amber-700">
+                                      ৳{ord.currentDue.toLocaleString()}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()
               )}
 
               {/* Payment Fields (Only visible when customer is selected) */}
               {selectedCustomer && (
                 <>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-slate-700">
-                        Collection Amount (৳)
-                      </Label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">
-                          ৳
-                        </span>
-                        <Input
-                          type="number"
-                          step="any"
-                          min="1"
-                          placeholder="e.g. 50000"
-                          value={formAmount}
-                          onChange={(e) => setFormAmount(e.target.value)}
-                          className="pl-8 font-mono font-bold text-emerald-800 border-slate-300 focus:border-emerald-500"
-                        />
-                      </div>
-                    </div>
+                  {(() => {
+                    const breakdown = getCustomerDueBreakdown(selectedCustomer.id)
+                    const parsedAmount = parseFloat(formAmount) || 0
+                    const isZeroDue = breakdown.totalDue <= 0
+                    return (
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs font-semibold text-slate-700">
+                              Collection Amount (৳)
+                            </Label>
+                            <span className="text-[11px] font-medium text-slate-500">
+                              Max Collectible:{" "}
+                              <strong className="font-mono text-amber-700 font-bold">
+                                ৳{breakdown.totalDue.toLocaleString()}
+                              </strong>
+                            </span>
+                          </div>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-slate-400">
+                              ৳
+                            </span>
+                            <Input
+                              type="number"
+                              step="any"
+                              min="1"
+                              max={breakdown.totalDue > 0 ? breakdown.totalDue : 0}
+                              disabled={isZeroDue}
+                              placeholder={
+                                isZeroDue
+                                  ? "৳0 Due (No collection needed)"
+                                  : `Max: ৳${breakdown.totalDue.toLocaleString()}`
+                              }
+                              value={formAmount}
+                              onChange={handleAmountChange}
+                              onKeyDown={handleAmountKeyDown}
+                              className={`pl-8 font-mono font-bold text-emerald-800 border-slate-300 focus:border-emerald-500 ${
+                                amountExceededWarning ? "border-rose-400 focus:border-rose-500 bg-rose-50/30" : ""
+                              }`}
+                            />
+                          </div>
 
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold text-slate-700">Collection Date</Label>
-                      <Input
-                        type="date"
-                        value={formDate}
-                        onChange={(e) => setFormDate(e.target.value)}
-                        className="border-slate-300 focus:border-emerald-500 text-sm"
-                      />
-                    </div>
-                  </div>
+                          {/* Quick Fill Preset Buttons */}
+                          {!isZeroDue && (
+                            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                              <span className="text-[10px] uppercase font-bold text-slate-400">
+                                Quick Fill:
+                              </span>
+                              {breakdown.openingDue > 0 && breakdown.orderDue > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormAmount(String(breakdown.openingDue))
+                                    setFormError("")
+                                    setAmountExceededWarning(false)
+                                  }}
+                                  className="cursor-pointer rounded bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900 hover:bg-amber-200 transition-colors"
+                                >
+                                  Existing: ৳{breakdown.openingDue.toLocaleString()}
+                                </button>
+                              )}
+                              {breakdown.orderDue > 0 && breakdown.openingDue > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setFormAmount(String(breakdown.orderDue))
+                                    setFormError("")
+                                    setAmountExceededWarning(false)
+                                  }}
+                                  className="cursor-pointer rounded bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-900 hover:bg-blue-200 transition-colors"
+                                >
+                                  Invoices: ৳{breakdown.orderDue.toLocaleString()}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormAmount(String(breakdown.totalDue))
+                                  setFormError("")
+                                  setAmountExceededWarning(false)
+                                }}
+                                className="cursor-pointer rounded bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-900 hover:bg-emerald-200 transition-colors"
+                              >
+                                Full Due (Max): ৳{breakdown.totalDue.toLocaleString()}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Dynamic Feedback Helpers */}
+                          {parsedAmount > breakdown.totalDue && (
+                            <div className="rounded-md border border-rose-300 bg-rose-50 p-2 text-xs text-rose-800 flex items-center justify-between gap-2 mt-1">
+                              <div className="flex items-center gap-1.5">
+                                <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
+                                <span>
+                                  <strong>৳{parsedAmount.toLocaleString()}</strong> exceeds Total Due (৳{breakdown.totalDue.toLocaleString()}) by <strong>৳{(parsedAmount - breakdown.totalDue).toLocaleString()}</strong>. <strong>Submit is blocked!</strong>
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormAmount(String(breakdown.totalDue))
+                                  setAmountExceededWarning(false)
+                                  setFormError("")
+                                }}
+                                className="cursor-pointer shrink-0 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold px-2 py-0.5 text-[11px] whitespace-nowrap transition-colors"
+                              >
+                                Fix to ৳{breakdown.totalDue.toLocaleString()}
+                              </button>
+                            </div>
+                          )}
+                          {!amountExceededWarning && parsedAmount > 0 && parsedAmount < breakdown.totalDue && (
+                            <p className="text-[11px] text-slate-500 pt-0.5">
+                              Remaining Due after payment:{" "}
+                              <span className="font-mono font-semibold text-amber-700">
+                                ৳{(breakdown.totalDue - parsedAmount).toLocaleString()}
+                              </span>
+                            </p>
+                          )}
+                          {!amountExceededWarning && parsedAmount > 0 && parsedAmount === breakdown.totalDue && (
+                            <p className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1 pt-0.5">
+                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                              Full balance will be settled. Remaining Due: ৳0.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold text-slate-700">Collection Date</Label>
+                          <Input
+                            type="date"
+                            value={formDate}
+                            onChange={(e) => setFormDate(e.target.value)}
+                            className="border-slate-300 focus:border-emerald-500 text-sm"
+                          />
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   {/* Live FIFO Allocation Preview */}
                   {liveAllocations.length > 0 && (
@@ -834,21 +1125,38 @@ export default function CollectionsPage() {
                       <div className="space-y-2">
                         {liveAllocations.map((item) => (
                           <div
-                            key={item.order.id}
-                            className="flex items-center justify-between rounded-md bg-white p-2.5 text-xs border border-emerald-100 shadow-2xs"
+                            key={item.id}
+                            className={`flex items-center justify-between rounded-md p-2.5 text-xs border shadow-2xs ${
+                              item.isOpeningBalance
+                                ? "bg-amber-50/80 border-amber-200"
+                                : "bg-white border-emerald-100"
+                            }`}
                           >
                             <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-slate-800">
-                                {item.order.code}
-                              </span>
-                              <span className="text-slate-400">({item.order.date})</span>
+                              {item.isOpeningBalance ? (
+                                <span className="font-bold text-amber-900 flex items-center gap-1.5">
+                                  <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+                                  Existing Due (Opening Balance)
+                                </span>
+                              ) : (
+                                <>
+                                  <span className="font-mono font-bold text-slate-800">
+                                    {item.orderCode}
+                                  </span>
+                                  <span className="text-slate-400">({item.dateText})</span>
+                                </>
+                              )}
                             </div>
                             <div className="flex items-center gap-3">
                               <span className="text-slate-500">
                                 Previous Due: ৳{item.previousDue.toLocaleString()}
                               </span>
                               <ArrowRight className="h-3 w-3 text-slate-400" />
-                              <span className="font-bold text-emerald-700">
+                              <span
+                                className={`font-bold ${
+                                  item.isOpeningBalance ? "text-amber-800" : "text-emerald-700"
+                                }`}
+                              >
                                 Paid: ৳{item.allocated.toLocaleString()}
                               </span>
                               <ArrowRight className="h-3 w-3 text-slate-400" />
@@ -895,8 +1203,14 @@ export default function CollectionsPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={!selectedCustomer}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-sm disabled:opacity-50"
+                  disabled={
+                    !selectedCustomer ||
+                    getCustomerDueBreakdown(selectedCustomer.id).totalDue <= 0 ||
+                    !formAmount ||
+                    parseFloat(formAmount) <= 0 ||
+                    parseFloat(formAmount) > getCustomerDueBreakdown(selectedCustomer.id).totalDue
+                  }
+                  className="cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Confirm & Record Collection
                 </Button>
@@ -906,14 +1220,26 @@ export default function CollectionsPage() {
         </div>
       )}
 
+      </div>
+
       {/* ========================================================================= */}
       {/* VIEW RECEIPT MODAL (Clean, Relevant, Official Money Receipt) */}
       {/* ========================================================================= */}
       {selectedReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
-          <div className="relative w-full max-w-3xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8">
-            {/* Modal Bar */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto print:static print:inset-auto print:p-0 print:bg-white print:overflow-visible"
+        >
+          {/* Backdrop for dismiss */}
+          <div
+            onClick={() => setSelectedReceipt(null)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs print:hidden"
+          />
+
+          <div className="relative z-10 w-full max-w-3xl rounded-xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8 print:border-none print:shadow-none print:m-0 print:max-w-none print:p-0 print:bg-white">
+            {/* Modal Bar (Hidden on print) */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4 print:hidden">
               <div className="flex items-center gap-2">
                 <Receipt className="h-5 w-5 text-emerald-600" />
                 <h3 className="text-base font-bold text-slate-900">Money Receipt / Collection Voucher</h3>
@@ -923,7 +1249,7 @@ export default function CollectionsPage() {
                   size="sm"
                   variant="outline"
                   onClick={() => window.print()}
-                  className="h-8 gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-100 text-xs"
+                  className="h-8 gap-1.5 border-slate-200 text-slate-700 hover:bg-slate-100 text-xs cursor-pointer"
                 >
                   <Printer className="h-3.5 w-3.5" />
                   Print
@@ -931,7 +1257,7 @@ export default function CollectionsPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedReceipt(null)}
-                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors cursor-pointer"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -939,7 +1265,7 @@ export default function CollectionsPage() {
             </div>
 
             {/* Receipt Body */}
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 print:p-0 print:bg-white text-slate-900">
               {/* Receipt Top Header */}
               <div className="flex items-center justify-between border-b border-slate-200 pb-4 gap-4">
                 <div className="flex items-center gap-3">
@@ -955,7 +1281,7 @@ export default function CollectionsPage() {
                   </div>
                   <div>
                     <h1 className="text-base font-bold tracking-tight text-slate-900">
-                      Eakin Animal Health Ltd.
+                      Eakin Animal Health
                     </h1>
                   </div>
                 </div>
@@ -1007,32 +1333,46 @@ export default function CollectionsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {selectedReceipt.allocations.map((alloc) => (
-                        <tr key={alloc.orderId} className="hover:bg-slate-50">
-                          <td className="py-2.5 px-3 font-mono font-medium text-slate-800 whitespace-nowrap">
-                            {alloc.orderCode}
-                          </td>
-                          <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
-                            {alloc.orderDate}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">
-                            ৳{alloc.originalGrandTotal.toLocaleString()}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono text-slate-500 whitespace-nowrap">
-                            ৳{alloc.previousDue.toLocaleString()}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
-                            ৳{alloc.allocatedAmount.toLocaleString()}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-800 whitespace-nowrap">
-                            {alloc.remainingDue === 0 ? (
-                              <span className="text-emerald-600 font-bold">Cleared (৳0)</span>
-                            ) : (
-                              `৳${alloc.remainingDue.toLocaleString()}`
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                      {selectedReceipt.allocations.map((alloc) => {
+                        const isOpening =
+                          alloc.orderId === "opening-balance" || alloc.orderCode === "EXISTING-DUE"
+                        return (
+                          <tr
+                            key={alloc.orderId}
+                            className={`hover:bg-slate-50 ${isOpening ? "bg-amber-50/40" : ""}`}
+                          >
+                            <td className="py-2.5 px-3 font-mono font-medium text-slate-800 whitespace-nowrap">
+                              {isOpening ? (
+                                <span className="inline-flex items-center gap-1.5 font-bold text-amber-900">
+                                  <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                                  Existing Due (Opening Balance)
+                                </span>
+                              ) : (
+                                alloc.orderCode
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
+                              {isOpening ? "Carried Forward" : alloc.orderDate}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono whitespace-nowrap">
+                              ৳{alloc.originalGrandTotal.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono text-slate-500 whitespace-nowrap">
+                              ৳{alloc.previousDue.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-700 whitespace-nowrap">
+                              ৳{alloc.allocatedAmount.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-800 whitespace-nowrap">
+                              {alloc.remainingDue === 0 ? (
+                                <span className="text-emerald-600 font-bold">Cleared (৳0)</span>
+                              ) : (
+                                `৳${alloc.remainingDue.toLocaleString()}`
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1050,13 +1390,13 @@ export default function CollectionsPage() {
 
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end border-t border-slate-100 bg-slate-50 px-6 py-3">
+            {/* Footer (Hidden on print) */}
+            <div className="flex items-center justify-end border-t border-slate-100 bg-slate-50 px-6 py-3 print:hidden">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setSelectedReceipt(null)}
-                className="border-slate-300 text-slate-700 hover:bg-slate-100 text-xs"
+                className="border-slate-300 text-slate-700 hover:bg-slate-100 text-xs cursor-pointer"
               >
                 Close
               </Button>
@@ -1064,6 +1404,6 @@ export default function CollectionsPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

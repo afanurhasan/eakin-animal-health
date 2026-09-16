@@ -7,6 +7,7 @@ import {
   Pencil,
   Trash2,
   MapPin,
+  MapPinned,
   Building,
   Building2,
   UsersRound,
@@ -26,6 +27,7 @@ import { type AreaItem } from "@/lib/mock-data"
 export default function AreasPage() {
   const {
     areas,
+    territories,
     regionalOffices,
     depots,
     ams,
@@ -267,6 +269,9 @@ export default function AreasPage() {
                   <th scope="col" className="px-4 py-3">
                     Assigned AM
                   </th>
+                  <th scope="col" className="px-4 py-3">
+                    Territories
+                  </th>
                   <th scope="col" className="w-32 px-4 py-3 text-right">
                     Actions
                   </th>
@@ -279,6 +284,7 @@ export default function AreasPage() {
                     const roDisplayName = ro ? ro.name : area.regionalOfficeName || "—"
                     const depotDisplayName = ro?.depotName || area.depotName || "Bogura Depot"
                     const assignedAM = ams.find((a) => a.areaId === area.id)
+                    const areaTerritories = territories.filter((t) => t.areaId === area.id)
 
                     return (
                       <tr
@@ -329,6 +335,14 @@ export default function AreasPage() {
                           ) : (
                             <span className="text-[11px] text-muted-foreground">Unassigned</span>
                           )}
+                        </td>
+
+                        {/* Territories Under Area */}
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1.5 rounded bg-primary/5 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                            <MapPinned className="size-3 text-primary" />
+                            <span>{areaTerritories.length} Territories</span>
+                          </span>
                         </td>
 
                         {/* Actions: Edit / Delete */}

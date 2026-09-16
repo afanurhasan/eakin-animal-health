@@ -39,6 +39,7 @@ import {
   type ProductReturnItem,
   type CollectionItem,
 } from "@/lib/mock-data"
+import { InvoiceSheet } from "@/components/invoice-sheet"
 
 export default function OfficerCustomerDetailPage() {
   const params = useParams()
@@ -162,7 +163,8 @@ export default function OfficerCustomerDetailPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <>
+      <div className={`space-y-4 ${selectedInvoice ? "print:hidden" : ""}`}>
       {/* Back Navigation Bar */}
       <div>
         <Link
@@ -571,17 +573,18 @@ export default function OfficerCustomerDetailPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       {/* Invoice Detail Modal */}
       {selectedInvoice && (
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 print:static print:inset-auto print:p-0 print:bg-white print:overflow-visible"
         >
-          <div onClick={() => setSelectedInvoice(null)} className="fixed inset-0 bg-black/60 backdrop-blur-xs" />
-          <div className="relative z-10 w-full max-w-3xl rounded-lg border border-border bg-card shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border/80 bg-muted/20 px-5 py-3">
+          <div onClick={() => setSelectedInvoice(null)} className="fixed inset-0 bg-black/60 backdrop-blur-xs print:hidden" />
+          <div className="relative z-10 w-full max-w-3xl rounded-lg border border-border bg-card shadow-2xl max-h-[92vh] flex flex-col overflow-hidden print:border-none print:shadow-none print:m-0 print:max-w-none print:max-h-none print:p-0 print:bg-white">
+            <div className="flex items-center justify-between border-b border-border/80 bg-muted/20 px-5 py-3 print:hidden">
               <div className="flex items-center gap-2">
                 <Receipt className="size-4 text-primary" />
                 <h3 className="text-sm font-semibold text-foreground">
@@ -599,85 +602,11 @@ export default function OfficerCustomerDetailPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-5 bg-card text-card-foreground">
-              <div className="flex items-center justify-between border-b border-border pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center">
-                    <Image src="/logo.jpeg" alt="Logo" width={150} height={40} className="h-10 w-auto object-contain" priority />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold text-foreground">Eakin Animal Health Ltd.</h2>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-xs font-bold text-foreground">{selectedInvoice.code}</div>
-                  <div className="text-[11px] text-muted-foreground">Date: {selectedInvoice.date}</div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 rounded border border-border p-3 text-xs">
-                <div>
-                  <div className="text-[10px] font-bold text-muted-foreground uppercase">Customer Details</div>
-                  <div className="font-bold text-foreground">{selectedInvoice.shopName}</div>
-                  <div>Proprietor: {selectedInvoice.customerName}</div>
-                  <div className="text-muted-foreground">{selectedInvoice.phone}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold text-muted-foreground uppercase">Order Information</div>
-                  <div>Officer: <strong>{selectedInvoice.officerName}</strong> ({selectedInvoice.officerCode})</div>
-                  <div>Depot: <strong>{selectedInvoice.depotName}</strong></div>
-                  <div>Status: <span className="font-semibold">{selectedInvoice.status}</span></div>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto rounded border border-border">
-                <table className="w-full text-left text-xs">
-                  <thead className="border-b border-border bg-muted/50 text-[10px] uppercase font-semibold text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2">SL</th>
-                      <th className="px-3 py-2">Product Code</th>
-                      <th className="px-3 py-2">Product Name</th>
-                      <th className="px-3 py-2">Pack Size</th>
-                      <th className="px-3 py-2 text-center">Qty</th>
-                      <th className="px-3 py-2 text-right">Price</th>
-                      <th className="px-3 py-2 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {selectedInvoice.items.map((it, idx) => (
-                      <tr key={it.id}>
-                        <td className="px-3 py-2 text-muted-foreground">{idx + 1}</td>
-                        <td className="px-3 py-2 font-mono text-primary">{it.productCode}</td>
-                        <td className="px-3 py-2 font-medium text-foreground">{it.productName}</td>
-                        <td className="px-3 py-2 text-muted-foreground">{it.packSize}</td>
-                        <td className="px-3 py-2 text-center font-bold">{it.quantity}</td>
-                        <td className="px-3 py-2 text-right font-mono">৳ {it.unitPrice.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right font-mono font-bold">৳ {it.totalPrice.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex justify-end">
-                <div className="w-64 space-y-1.5 rounded border border-border bg-muted/20 p-3 text-xs">
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Subtotal:</span>
-                    <span className="font-mono">৳ {selectedInvoice.subtotal.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Discount ({selectedInvoice.discountPercent}%):</span>
-                    <span className="font-mono text-primary">- ৳ {selectedInvoice.discountAmount.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between border-t border-border pt-1 font-bold text-foreground">
-                    <span>Grand Total:</span>
-                    <span className="font-mono text-primary">৳ {selectedInvoice.grandTotal.toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
+            <div className="flex-1 overflow-y-auto p-6 bg-card text-card-foreground print:p-0 print:overflow-visible print:bg-white print:text-black">
+              <InvoiceSheet order={selectedInvoice} />
             </div>
 
-            <div className="flex justify-end border-t border-border/80 bg-muted/20 px-5 py-3">
+            <div className="flex justify-end border-t border-border/80 bg-muted/20 px-5 py-3 print:hidden">
               <Button type="button" variant="outline" size="sm" onClick={() => setSelectedInvoice(null)}>
                 Close
               </Button>
@@ -777,6 +706,6 @@ export default function OfficerCustomerDetailPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

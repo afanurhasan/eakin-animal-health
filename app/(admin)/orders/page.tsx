@@ -48,7 +48,8 @@ import {
   type Depot,
   type Product,
 } from "@/lib/mock-data"
-import { formatDateTime } from "@/lib/utils"
+import { formatDateTime, formatDate, numberToWords } from "@/lib/utils"
+import { InvoiceSheet } from "@/components/invoice-sheet"
 
 interface BonusInputRow {
   rowId: string
@@ -653,7 +654,8 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <>
+      <div className={`space-y-5 ${selectedInvoiceOrder ? "print:hidden" : ""}`}>
       {/* Toast Notification */}
       {toastMessage && (
         <div
@@ -973,6 +975,7 @@ export default function OrdersPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
 
       {/* ========================================================= */}
       {/* 1. ORDER DETAIL / INVOICE MODAL VIEW                      */}
@@ -982,16 +985,16 @@ export default function OrdersPage() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="invoice-modal-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 print:static print:inset-auto print:p-0 print:bg-white print:overflow-visible"
         >
           <div
             onClick={() => setSelectedInvoiceOrder(null)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity print:hidden"
           />
 
-          <div className="relative z-10 w-full max-w-3xl rounded-lg border border-border bg-card shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
-            {/* Modal Header / Toolbar */}
-            <div className="flex items-center justify-between border-b border-border/80 bg-muted/20 px-5 py-3">
+          <div className="relative z-10 w-full max-w-3xl rounded-lg border border-border bg-card shadow-2xl max-h-[92vh] flex flex-col overflow-hidden print:border-none print:shadow-none print:m-0 print:max-w-none print:max-h-none print:p-0 print:bg-white">
+            {/* Modal Header / Toolbar (Hidden on print) */}
+            <div className="flex items-center justify-between border-b border-border/80 bg-muted/20 px-5 py-3 print:hidden">
               <div className="flex items-center gap-2">
                 <Receipt className="size-4 text-primary" />
                 <h3 id="invoice-modal-title" className="text-sm font-semibold text-foreground">
@@ -1022,255 +1025,12 @@ export default function OrdersPage() {
             </div>
 
             {/* Invoice Printable Sheet Content */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-card text-card-foreground print:p-0">
-              {/* Brand Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-border pb-5 gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center">
-                    <Image
-                      src="/logo.jpeg"
-                      alt="Eakin Animal Health Logo"
-                      width={160}
-                      height={45}
-                      className="h-10 w-auto object-contain"
-                      priority
-                    />
-                  </div>
-                  <div>
-                    <h1 className="text-base font-bold tracking-tight text-foreground">
-                      Eakin Animal Health Ltd.
-                    </h1>
-                  </div>
-                </div>
-
-                <div className="text-left sm:text-right">
-                  <div className="inline-block rounded border border-primary/20 bg-primary/5 px-2.5 py-1 text-xs font-mono font-bold text-primary">
-                    INVOICE
-                  </div>
-                  <div className="mt-1 font-mono text-xs font-bold text-foreground">
-                    {selectedInvoiceOrder.code}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    Date: {selectedInvoiceOrder.date}
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Banner */}
-              <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 p-3 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-muted-foreground">Order Status:</span>
-                  {selectedInvoiceOrder.status === "Pending" && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 px-2.5 py-0.5 font-semibold text-[11px]">
-                      <Clock className="size-3" /> Pending Review
-                    </span>
-                  )}
-                  {selectedInvoiceOrder.status === "Approved" && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-primary/20 text-primary px-2.5 py-0.5 font-semibold text-[11px]">
-                      <CheckCircle2 className="size-3" /> Approved & Dispatched
-                    </span>
-                  )}
-                  {selectedInvoiceOrder.status === "Cancelled" && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-destructive/20 text-destructive px-2.5 py-0.5 font-semibold text-[11px]">
-                      <XCircle className="size-3" /> Cancelled
-                    </span>
-                  )}
-                </div>
-
-                {selectedInvoiceOrder.approvedAt && (
-                  <div className="text-[11px] text-muted-foreground">
-                    Approved On: <span className="font-medium text-foreground">{selectedInvoiceOrder.approvedAt}</span>
-                  </div>
-                )}
-                {selectedInvoiceOrder.cancelledAt && (
-                  <div className="text-[11px] text-destructive">
-                    Cancelled On: <span className="font-medium">{selectedInvoiceOrder.cancelledAt}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Customer & Order Metadata Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-md border border-border/80 bg-card p-4 text-xs">
-                {/* Customer Information */}
-                <div className="space-y-1.5 border-b sm:border-b-0 sm:border-r border-border pb-3 sm:pb-0 sm:pr-4">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Bill To / Customer Information
-                  </div>
-                  <div className="text-sm font-bold text-foreground">
-                    {selectedInvoiceOrder.shopName}
-                  </div>
-                  <div className="font-medium text-foreground">
-                    Proprietor: {selectedInvoiceOrder.customerName}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-muted-foreground font-mono text-[11px]">
-                    <Store className="size-3 text-muted-foreground" />
-                    <span>Customer Code: {selectedInvoiceOrder.customerCode}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-muted-foreground font-mono text-[11px]">
-                    <Phone className="size-3 text-muted-foreground" />
-                    <span>{selectedInvoiceOrder.phone}</span>
-                  </div>
-                  <div className="flex items-start gap-1.5 text-muted-foreground text-[11px]">
-                    <MapPin className="size-3 text-muted-foreground mt-0.5 shrink-0" />
-                    <span>{selectedInvoiceOrder.address}</span>
-                  </div>
-                </div>
-
-                {/* Sales Officer & Depot Details */}
-                <div className="space-y-1.5 sm:pl-2">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Fulfillment & Representative
-                  </div>
-                  <div className="text-xs">
-                    <span className="text-muted-foreground">MPO: </span>
-                    <span className="font-semibold text-foreground">{selectedInvoiceOrder.officerName}</span>
-                    <span className="ml-1 font-mono text-[10px] text-muted-foreground">({selectedInvoiceOrder.officerCode})</span>
-                  </div>
-                  <div className="text-xs">
-                    <span className="text-muted-foreground">Fulfillment Depot: </span>
-                    <span className="font-semibold text-foreground">{selectedInvoiceOrder.depotName}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Order Items Table */}
-              <div className="space-y-2">
-                <div className="text-xs font-semibold text-foreground">Purchased Products</div>
-                <div className="overflow-x-auto rounded border border-border">
-                  <table className="w-full text-left text-xs">
-                    <thead className="border-b border-border bg-muted/50 text-[11px] font-semibold text-muted-foreground uppercase">
-                      <tr>
-                        <th scope="col" className="w-10 px-3 py-2 text-center">
-                          SL
-                        </th>
-                        <th scope="col" className="px-3 py-2">
-                          Product Code
-                        </th>
-                        <th scope="col" className="px-3 py-2">
-                          Product Name
-                        </th>
-                        <th scope="col" className="px-3 py-2">
-                          Pack Size
-                        </th>
-                        <th scope="col" className="px-3 py-2 text-center">
-                          Quantity
-                        </th>
-                        <th scope="col" className="px-3 py-2 text-right">
-                          Unit Price (৳)
-                        </th>
-                        <th scope="col" className="px-3 py-2 text-right">
-                          Total (৳)
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {selectedInvoiceOrder.items.map((item, idx) => (
-                        <tr key={item.id} className="transition-colors hover:bg-muted/20">
-                          <td className="px-3 py-2 text-center font-medium text-muted-foreground">
-                            {idx + 1}
-                          </td>
-                          <td className="px-3 py-2 font-mono text-[11px] font-medium text-primary">
-                            {item.productCode}
-                          </td>
-                          <td className="px-3 py-2 font-semibold text-foreground">
-                            {item.productName}
-                          </td>
-                          <td className="px-3 py-2 text-muted-foreground">
-                            {item.packSize}
-                          </td>
-                          <td className="px-3 py-2 text-center font-mono font-bold text-foreground">
-                            {item.quantity}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-                            ৳ {item.unitPrice.toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono font-bold text-foreground">
-                            ৳ {item.totalPrice.toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Bonus Products Section (if any assigned) */}
-              {selectedInvoiceOrder.bonusItems && selectedInvoiceOrder.bonusItems.length > 0 && (
-                <div className="space-y-2 rounded-md border border-primary/20 bg-primary/5 p-3">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-                    <Gift className="size-3.5" />
-                    <span>Bonus Products Assigned</span>
-                  </div>
-                  <div className="overflow-x-auto rounded border border-primary/20 bg-card">
-                    <table className="w-full text-left text-xs">
-                      <thead className="border-b border-primary/10 bg-primary/10 text-[10px] font-semibold text-primary uppercase">
-                        <tr>
-                          <th scope="col" className="w-10 px-3 py-2 text-center">SL</th>
-                          <th scope="col" className="px-3 py-2">Product Code</th>
-                          <th scope="col" className="px-3 py-2">Bonus Product Name</th>
-                          <th scope="col" className="px-3 py-2">Pack Size</th>
-                          <th scope="col" className="px-3 py-2 text-right">Bonus Quantity</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/60">
-                        {selectedInvoiceOrder.bonusItems.map((bonus, bIdx) => (
-                          <tr key={bonus.id}>
-                            <td className="px-3 py-1.5 text-center text-muted-foreground font-mono">{bIdx + 1}</td>
-                            <td className="px-3 py-1.5 font-mono text-primary font-medium">{bonus.productCode}</td>
-                            <td className="px-3 py-1.5 font-semibold text-foreground">{bonus.productName}</td>
-                            <td className="px-3 py-1.5 text-muted-foreground">{bonus.packSize}</td>
-                            <td className="px-3 py-1.5 text-right font-mono font-bold text-primary">
-                              +{bonus.quantity}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Financial Calculation Box */}
-              <div className="flex justify-end pt-2">
-                <div className="w-full max-w-xs space-y-2 rounded-md border border-border bg-muted/20 p-3.5 text-xs">
-                  <div className="flex items-center justify-between text-muted-foreground">
-                    <span>Subtotal:</span>
-                    <span className="font-mono font-semibold text-foreground">
-                      ৳ {selectedInvoiceOrder.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-
-                  {/* Officer Discount */}
-                  <div className="flex items-center justify-between text-muted-foreground">
-                    <span>Officer Discount ({selectedInvoiceOrder.officerDiscountPercent ?? 2.5}%):</span>
-                    <span className="font-mono font-semibold text-primary">
-                      - ৳ {((selectedInvoiceOrder.subtotal * (selectedInvoiceOrder.officerDiscountPercent ?? 2.5)) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-
-                  {/* Admin Additional Discount if any */}
-                  {selectedInvoiceOrder.adminDiscountPercent !== undefined && selectedInvoiceOrder.adminDiscountPercent > 0 && (
-                    <div className="flex items-center justify-between text-muted-foreground">
-                      <span>Admin Addl. Discount ({selectedInvoiceOrder.adminDiscountPercent}%):</span>
-                      <span className="font-mono font-semibold text-primary">
-                        - ৳ {((selectedInvoiceOrder.subtotal * selectedInvoiceOrder.adminDiscountPercent) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="border-t border-border pt-2 flex items-center justify-between font-bold text-sm text-foreground">
-                    <span>Grand Total:</span>
-                    <span className="font-mono text-base text-primary">
-                      ৳ {selectedInvoiceOrder.grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
+            <div className="flex-1 overflow-y-auto p-6 bg-card text-card-foreground print:p-0 print:overflow-visible print:bg-white print:text-black">
+              <InvoiceSheet order={selectedInvoiceOrder} />
             </div>
 
-            {/* Modal Bottom Bar */}
-            <div className="flex items-center justify-between border-t border-border/80 bg-muted/20 px-5 py-3">
+            {/* Modal Bottom Bar (Hidden on print) */}
+            <div className="flex items-center justify-between border-t border-border/80 bg-muted/20 px-5 py-3 print:hidden">
               <div>
                 {selectedInvoiceOrder.status === "Pending" && (
                   <Button
@@ -1362,7 +1122,7 @@ export default function OrdersPage() {
                     </div>
                     <div>
                       <h1 className="text-sm font-bold tracking-tight text-foreground">
-                        Eakin Animal Health Ltd.
+                        Eakin Animal Health
                       </h1>
                     </div>
                   </div>
@@ -1440,7 +1200,7 @@ export default function OrdersPage() {
                           <th scope="col" className="px-3 py-2">Product Name</th>
                           <th scope="col" className="px-3 py-2">Pack Size</th>
                           <th scope="col" className="px-3 py-2 text-center">Quantity</th>
-                          <th scope="col" className="px-3 py-2 text-right">Unit Price (৳)</th>
+                          <th scope="col" className="px-3 py-2 text-right">TP (৳)</th>
                           <th scope="col" className="px-3 py-2 text-right">Total (৳)</th>
                         </tr>
                       </thead>
@@ -2200,9 +1960,9 @@ export default function OrdersPage() {
                                   </div>
                                   <div className="text-right flex items-center gap-3">
                                     <div>
-                                      <span className="text-[10px] text-muted-foreground block">Unit Price</span>
+                                      <span className="text-[10px] text-muted-foreground block">TP</span>
                                       <span className="font-bold text-foreground font-mono text-xs">
-                                        ৳ {(prod.sellPrice || prod.price || 0).toLocaleString()}
+                                        ৳ {(prod.tp || prod.sellPrice || prod.price || 0).toLocaleString()}
                                       </span>
                                     </div>
                                     <div>
@@ -2242,7 +2002,7 @@ export default function OrdersPage() {
                             <tr>
                               <th scope="col" className="w-10 px-3 py-2 text-center">SL</th>
                               <th scope="col" className="px-3 py-2">Product</th>
-                              <th scope="col" className="px-3 py-2 text-right">Unit Price (৳)</th>
+                              <th scope="col" className="px-3 py-2 text-right">TP (৳)</th>
                               <th scope="col" className="w-36 px-3 py-2 text-center">Quantity</th>
                               <th scope="col" className="px-3 py-2 text-right">Line Total (৳)</th>
                               <th scope="col" className="w-12 px-2 py-2 text-center">Remove</th>
@@ -2415,6 +2175,6 @@ export default function OrdersPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

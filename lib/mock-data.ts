@@ -24,9 +24,10 @@ export interface Product {
   code: string
   name: string
   packSize: string
-  buyPrice: number
-  sellPrice: number
-  price: number // alias/backward compatibility for sellPrice
+  tp: number // Trade Price
+  price: number // alias/backward compatibility for tp
+  sellPrice?: number
+  buyPrice?: number
 }
 
 export interface DepotStockItem {
@@ -208,6 +209,18 @@ export interface AreaItem {
   depotName?: string
 }
 
+export interface TerritoryItem {
+  id: string
+  code: string
+  name: string
+  areaId: string
+  areaName?: string
+  regionalOfficeId?: string
+  regionalOfficeName?: string
+  depotId?: string
+  depotName?: string
+}
+
 export interface RMItem {
   id: string
   code: string
@@ -245,6 +258,8 @@ export interface SalesOfficerItem {
   pin?: string
   areaId: string
   areaName: string
+  territoryId?: string
+  territoryName?: string
   rmId: string
   rmName: string
   amId: string
@@ -266,6 +281,8 @@ export interface CustomerItem {
   address: string
   areaId: string
   areaName: string
+  territoryId?: string
+  territoryName?: string
   rmId: string
   rmName: string
   amId: string
@@ -324,7 +341,8 @@ export const productCatalog: Product[] = [
     code: "EAK-EFL-100",
     name: "Eflor 20",
     packSize: "100ml",
-    buyPrice: 620,
+    tp: 780,
+    buyPrice: 780,
     sellPrice: 780,
     price: 780,
   },
@@ -333,7 +351,8 @@ export const productCatalog: Product[] = [
     code: "EAK-EFL-500",
     name: "Eflor 20",
     packSize: "500ml",
-    buyPrice: 2300,
+    tp: 2880,
+    buyPrice: 2880,
     sellPrice: 2880,
     price: 2880,
   },
@@ -342,7 +361,8 @@ export const productCatalog: Product[] = [
     code: "EAK-MAX-100",
     name: "Maxtil plus",
     packSize: "100ml",
-    buyPrice: 540,
+    tp: 680,
+    buyPrice: 680,
     sellPrice: 680,
     price: 680,
   },
@@ -351,7 +371,8 @@ export const productCatalog: Product[] = [
     code: "EAK-MAX-500",
     name: "Maxtil plus",
     packSize: "500ml",
-    buyPrice: 2240,
+    tp: 2800,
+    buyPrice: 2800,
     sellPrice: 2800,
     price: 2800,
   },
@@ -360,7 +381,8 @@ export const productCatalog: Product[] = [
     code: "EAK-SNE-500",
     name: "S neo pro",
     packSize: "500gm",
-    buyPrice: 1135,
+    tp: 1420,
+    buyPrice: 1420,
     sellPrice: 1420,
     price: 1420,
   },
@@ -369,7 +391,8 @@ export const productCatalog: Product[] = [
     code: "EAK-EST-100",
     name: "EST 30",
     packSize: "100gm",
-    buyPrice: 310,
+    tp: 390,
+    buyPrice: 390,
     sellPrice: 390,
     price: 390,
   },
@@ -378,7 +401,8 @@ export const productCatalog: Product[] = [
     code: "EAK-EBA-050",
     name: "Ebac plu",
     packSize: "50gm",
-    buyPrice: 95,
+    tp: 120,
+    buyPrice: 120,
     sellPrice: 120,
     price: 120,
   },
@@ -387,7 +411,8 @@ export const productCatalog: Product[] = [
     code: "EAK-ALV-1LT",
     name: "Anti LV",
     packSize: "1LT.",
-    buyPrice: 800,
+    tp: 1010,
+    buyPrice: 1010,
     sellPrice: 1010,
     price: 1010,
   },
@@ -396,7 +421,8 @@ export const productCatalog: Product[] = [
     code: "EAK-XEV-1LT",
     name: "Xinc E vet",
     packSize: "1LT.",
-    buyPrice: 175,
+    tp: 220,
+    buyPrice: 220,
     sellPrice: 220,
     price: 220,
   },
@@ -405,7 +431,8 @@ export const productCatalog: Product[] = [
     code: "EAK-XEV-3LT",
     name: "Xinc E vet",
     packSize: "3LT.",
-    buyPrice: 440,
+    tp: 550,
+    buyPrice: 550,
     sellPrice: 550,
     price: 550,
   },
@@ -414,7 +441,8 @@ export const productCatalog: Product[] = [
     code: "EAK-XBZ-1LT",
     name: "Xinc BZ",
     packSize: "1LT.",
-    buyPrice: 260,
+    tp: 330,
+    buyPrice: 330,
     sellPrice: 330,
     price: 330,
   },
@@ -423,7 +451,8 @@ export const productCatalog: Product[] = [
     code: "EAK-URI-100",
     name: "Urinill",
     packSize: "100ml",
-    buyPrice: 215,
+    tp: 270,
+    buyPrice: 270,
     sellPrice: 270,
     price: 270,
   },
@@ -432,7 +461,8 @@ export const productCatalog: Product[] = [
     code: "EAK-URI-500",
     name: "Urinill",
     packSize: "500ml",
-    buyPrice: 920,
+    tp: 1150,
+    buyPrice: 1150,
     sellPrice: 1150,
     price: 1150,
   },
@@ -441,7 +471,8 @@ export const productCatalog: Product[] = [
     code: "EAK-CAL-5LT",
     name: "Callwell P",
     packSize: "5LT.",
-    buyPrice: 1160,
+    tp: 1450,
+    buyPrice: 1450,
     sellPrice: 1450,
     price: 1450,
   },
@@ -450,7 +481,8 @@ export const productCatalog: Product[] = [
     code: "EAK-HEA-1LT",
     name: "Heatcon",
     packSize: "1LT.",
-    buyPrice: 650,
+    tp: 810,
+    buyPrice: 810,
     sellPrice: 810,
     price: 810,
   },
@@ -459,7 +491,8 @@ export const productCatalog: Product[] = [
     code: "EAK-CYT-100",
     name: "Cytoliv",
     packSize: "100ml",
-    buyPrice: 120,
+    tp: 150,
+    buyPrice: 150,
     sellPrice: 150,
     price: 150,
   },
@@ -468,7 +501,8 @@ export const productCatalog: Product[] = [
     code: "EAK-CYT-1LT",
     name: "Cytoliv",
     packSize: "1LT.",
-    buyPrice: 1020,
+    tp: 1280,
+    buyPrice: 1280,
     sellPrice: 1280,
     price: 1280,
   },
@@ -477,7 +511,8 @@ export const productCatalog: Product[] = [
     code: "EAK-IMG-100",
     name: "Imugin",
     packSize: "100gm",
-    buyPrice: 400,
+    tp: 510,
+    buyPrice: 510,
     sellPrice: 510,
     price: 510,
   },
@@ -486,7 +521,8 @@ export const productCatalog: Product[] = [
     code: "EAK-IMG-G100",
     name: "Imu G",
     packSize: "100gm",
-    buyPrice: 520,
+    tp: 650,
+    buyPrice: 650,
     sellPrice: 650,
     price: 650,
   },
@@ -711,14 +747,95 @@ export const initialTransfers: StockTransfer[] = [
   },
 ]
 
-// Initial Areas with Regional Office associations (2 per Regional Office, Total 4 Areas)
+// Initial Areas with Regional Office associations (Strictly 2 Areas: Bogura & Rangpur)
 export const initialAreasWithDepot: AreaItem[] = [
-  // Bogura Regional Office (2 areas)
+  // Bogura Regional Office
   { id: "area-1", code: "AREA-BOG-01", name: "Bogura", regionalOfficeId: "ro-1", regionalOfficeName: "Bogura Regional Office", depotId: "dep-1", depotName: "Bogura Depot" },
-  { id: "area-2", code: "AREA-BOG-02", name: "Dhunot", regionalOfficeId: "ro-1", regionalOfficeName: "Bogura Regional Office", depotId: "dep-1", depotName: "Bogura Depot" },
-  // Rangpur Regional Office (2 areas)
-  { id: "area-3", code: "AREA-RAN-01", name: "Rangpur", regionalOfficeId: "ro-2", regionalOfficeName: "Rangpur Regional Office", depotId: "dep-2", depotName: "Rangpur Depot" },
-  { id: "area-4", code: "AREA-RAN-02", name: "Gobindaganj", regionalOfficeId: "ro-2", regionalOfficeName: "Rangpur Regional Office", depotId: "dep-2", depotName: "Rangpur Depot" },
+  // Rangpur Regional Office
+  { id: "area-2", code: "AREA-RAN-01", name: "Rangpur", regionalOfficeId: "ro-2", regionalOfficeName: "Rangpur Regional Office", depotId: "dep-2", depotName: "Rangpur Depot" },
+]
+
+// Initial Territories created under Areas (5 in Bogura Area, 2 in Rangpur Area)
+export const initialTerritories: TerritoryItem[] = [
+  // Bogura Area Territories (5 territories)
+  {
+    id: "ter-1",
+    code: "TER-BOG-01",
+    name: "Bogura Sadar",
+    areaId: "area-1",
+    areaName: "Bogura",
+    regionalOfficeId: "ro-1",
+    regionalOfficeName: "Bogura Regional Office",
+    depotId: "dep-1",
+    depotName: "Bogura Depot",
+  },
+  {
+    id: "ter-2",
+    code: "TER-BOG-02",
+    name: "Dhunot",
+    areaId: "area-1",
+    areaName: "Bogura",
+    regionalOfficeId: "ro-1",
+    regionalOfficeName: "Bogura Regional Office",
+    depotId: "dep-1",
+    depotName: "Bogura Depot",
+  },
+  {
+    id: "ter-3",
+    code: "TER-BOG-03",
+    name: "Gabtoli",
+    areaId: "area-1",
+    areaName: "Bogura",
+    regionalOfficeId: "ro-1",
+    regionalOfficeName: "Bogura Regional Office",
+    depotId: "dep-1",
+    depotName: "Bogura Depot",
+  },
+  {
+    id: "ter-4",
+    code: "TER-BOG-04",
+    name: "Kahaloo",
+    areaId: "area-1",
+    areaName: "Bogura",
+    regionalOfficeId: "ro-1",
+    regionalOfficeName: "Bogura Regional Office",
+    depotId: "dep-1",
+    depotName: "Bogura Depot",
+  },
+  {
+    id: "ter-5",
+    code: "TER-BOG-05",
+    name: "Shibganj",
+    areaId: "area-1",
+    areaName: "Bogura",
+    regionalOfficeId: "ro-1",
+    regionalOfficeName: "Bogura Regional Office",
+    depotId: "dep-1",
+    depotName: "Bogura Depot",
+  },
+  // Rangpur Area Territories
+  {
+    id: "ter-6",
+    code: "TER-RAN-01",
+    name: "Rangpur Sadar",
+    areaId: "area-2",
+    areaName: "Rangpur",
+    regionalOfficeId: "ro-2",
+    regionalOfficeName: "Rangpur Regional Office",
+    depotId: "dep-2",
+    depotName: "Rangpur Depot",
+  },
+  {
+    id: "ter-7",
+    code: "TER-RAN-02",
+    name: "Mithapukur",
+    areaId: "area-2",
+    areaName: "Rangpur",
+    regionalOfficeId: "ro-2",
+    regionalOfficeName: "Rangpur Regional Office",
+    depotId: "dep-2",
+    depotName: "Rangpur Depot",
+  },
 ]
 
 // Initial Regional Managers (RM) (Exactly 2 RMs)
@@ -748,12 +865,12 @@ export const initialRMs: RMItem[] = [
     regionalOfficeName: "Rangpur Regional Office",
     depotIds: ["dep-2", "dep-1"],
     depotNames: ["Rangpur Depot", "Bogura Depot"],
-    areaId: "area-3",
+    areaId: "area-2",
     areaName: "Rangpur",
   },
 ]
 
-// Initial Area Managers (AM) (Exactly 2 AMs)
+// Initial Area Managers (AM) (Exactly 2 AMs, belonging to Area)
 export const initialAMs: AMItem[] = [
   {
     id: "am-1",
@@ -774,14 +891,14 @@ export const initialAMs: AMItem[] = [
     phone: "01922-400500",
     email: "tariqul@eakinhealth.com",
     pin: "123456",
-    areaId: "area-3",
+    areaId: "area-2",
     areaName: "Rangpur",
     rmId: "rm-2",
     rmName: "Mustafizur Rahman",
   },
 ]
 
-// Initial MPOs (formerly Sales Officers) (Exactly 2 MPOs)
+// Initial MPOs (belonging to Territory under Area)
 export const initialOfficers: SalesOfficerItem[] = [
   {
     id: "off-1",
@@ -792,6 +909,8 @@ export const initialOfficers: SalesOfficerItem[] = [
     pin: "123456",
     areaId: "area-1",
     areaName: "Bogura",
+    territoryId: "ter-1",
+    territoryName: "Bogura Sadar",
     rmId: "rm-1",
     rmName: "Md. Rahim",
     amId: "am-1",
@@ -806,8 +925,10 @@ export const initialOfficers: SalesOfficerItem[] = [
     phone: "01833-445566",
     email: "zakir@eakinhealth.com",
     pin: "123456",
-    areaId: "area-3",
+    areaId: "area-2",
     areaName: "Rangpur",
+    territoryId: "ter-6",
+    territoryName: "Rangpur Sadar",
     rmId: "rm-2",
     rmName: "Mustafizur Rahman",
     amId: "am-2",
@@ -819,7 +940,7 @@ export const initialOfficers: SalesOfficerItem[] = [
 
 // Initial Customers (2 per Region/Area, Total 4 Customers)
 export const initialCustomers: CustomerItem[] = [
-  // Bogura Region (2 customers under MPO Arafat Hossain)
+  // Bogura Region (under MPO Arafat Hossain)
   {
     id: "cust-1",
     code: "CUST-001",
@@ -830,6 +951,8 @@ export const initialCustomers: CustomerItem[] = [
     address: "Holding #45, Station Road, Bogura",
     areaId: "area-1",
     areaName: "Bogura",
+    territoryId: "ter-1",
+    territoryName: "Bogura Sadar",
     rmId: "rm-1",
     rmName: "Md. Rahim",
     amId: "am-1",
@@ -849,8 +972,10 @@ export const initialCustomers: CustomerItem[] = [
     phone: "01722-334411",
     email: "bismillah.vet@example.com",
     address: "Shop #12, Market Complex, Dhunot",
-    areaId: "area-2",
-    areaName: "Dhunot",
+    areaId: "area-1",
+    areaName: "Bogura",
+    territoryId: "ter-2",
+    territoryName: "Dhunot",
     rmId: "rm-1",
     rmName: "Md. Rahim",
     amId: "am-1",
@@ -862,7 +987,7 @@ export const initialCustomers: CustomerItem[] = [
     totalOrders: 12,
     totalSpent: 280000,
   },
-  // Rangpur Region (2 customers under MPO Zakir Hossain)
+  // Rangpur Region (under MPO Zakir Hossain)
   {
     id: "cust-3",
     code: "CUST-003",
@@ -871,8 +996,10 @@ export const initialCustomers: CustomerItem[] = [
     phone: "01866-778855",
     email: "northern.agro@example.com",
     address: "Station Road, Rangpur Sadar",
-    areaId: "area-3",
+    areaId: "area-2",
     areaName: "Rangpur",
+    territoryId: "ter-6",
+    territoryName: "Rangpur Sadar",
     rmId: "rm-2",
     rmName: "Mustafizur Rahman",
     amId: "am-2",
@@ -891,9 +1018,11 @@ export const initialCustomers: CustomerItem[] = [
     shopName: "Janani Animal Care & Pharmacy",
     phone: "01799-889900",
     email: "janani.vet@example.com",
-    address: "Hospital Gate, Gobindaganj",
-    areaId: "area-4",
-    areaName: "Gobindaganj",
+    address: "Hospital Gate, Mithapukur",
+    areaId: "area-2",
+    areaName: "Rangpur",
+    territoryId: "ter-7",
+    territoryName: "Mithapukur",
     rmId: "rm-2",
     rmName: "Mustafizur Rahman",
     amId: "am-2",
@@ -904,6 +1033,29 @@ export const initialCustomers: CustomerItem[] = [
     outstandingBalance: 20000,
     totalOrders: 14,
     totalSpent: 290000,
+  },
+  {
+    id: "cust-5",
+    code: "CUST-005",
+    name: "Al-Madina Agro & Veterinary",
+    shopName: "Al-Madina Animal Health Care",
+    phone: "01733-445566",
+    email: "almadina.vet@example.com",
+    address: "Bypass Road, Gabtoli, Bogura",
+    areaId: "area-1",
+    areaName: "Bogura",
+    territoryId: "ter-3",
+    territoryName: "Gabtoli",
+    rmId: "rm-1",
+    rmName: "Md. Rahim",
+    amId: "am-1",
+    amName: "Md. Karim",
+    officerId: "off-1",
+    officerName: "Arafat Hossain",
+    creditLimit: 150000,
+    outstandingBalance: 45000,
+    totalOrders: 0,
+    totalSpent: 0,
   },
 ]
 

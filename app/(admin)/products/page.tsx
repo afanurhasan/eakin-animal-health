@@ -37,16 +37,14 @@ export default function ProductsPage() {
     code: "",
     name: "",
     packSize: "",
-    buyPrice: "",
-    sellPrice: "",
+    tp: "",
   })
 
   const [formErrors, setFormErrors] = React.useState<{
     code?: string
     name?: string
     packSize?: string
-    buyPrice?: string
-    sellPrice?: string
+    tp?: string
   }>({})
 
   const [toastMessage, setToastMessage] = React.useState<string | null>(null)
@@ -78,8 +76,7 @@ export default function ProductsPage() {
       code: `EAK-${String(nextNum).padStart(3, "0")}`,
       name: "",
       packSize: "100ml",
-      buyPrice: "",
-      sellPrice: "",
+      tp: "",
     })
     setFormErrors({})
     setIsCreateOpen(true)
@@ -92,8 +89,7 @@ export default function ProductsPage() {
       code: prod.code,
       name: prod.name,
       packSize: prod.packSize,
-      buyPrice: String(prod.buyPrice ?? Math.round((prod.price || 0) * 0.8)),
-      sellPrice: String(prod.sellPrice ?? prod.price ?? ""),
+      tp: String(prod.tp ?? prod.sellPrice ?? prod.price ?? ""),
     })
     setFormErrors({})
   }
@@ -105,8 +101,7 @@ export default function ProductsPage() {
       code?: string
       name?: string
       packSize?: string
-      buyPrice?: string
-      sellPrice?: string
+      tp?: string
     } = {}
 
     if (!formData.code.trim()) {
@@ -118,11 +113,8 @@ export default function ProductsPage() {
     if (!formData.packSize.trim()) {
       errors.packSize = "Please specify a pack size."
     }
-    if (!formData.buyPrice.trim() || isNaN(parseFloat(formData.buyPrice)) || parseFloat(formData.buyPrice) <= 0) {
-      errors.buyPrice = "Please enter a valid buy price in Taka."
-    }
-    if (!formData.sellPrice.trim() || isNaN(parseFloat(formData.sellPrice)) || parseFloat(formData.sellPrice) <= 0) {
-      errors.sellPrice = "Please enter a valid sell price in Taka."
+    if (!formData.tp.trim() || isNaN(parseFloat(formData.tp)) || parseFloat(formData.tp) <= 0) {
+      errors.tp = "Please enter a valid TP (Trade Price) in Taka."
     }
 
     if (Object.keys(errors).length > 0) {
@@ -130,8 +122,7 @@ export default function ProductsPage() {
       return
     }
 
-    const buyPriceNum = parseFloat(formData.buyPrice)
-    const sellPriceNum = parseFloat(formData.sellPrice)
+    const tpNum = parseFloat(formData.tp)
 
     if (editingProduct) {
       setProducts((prev) =>
@@ -142,9 +133,10 @@ export default function ProductsPage() {
                 code: formData.code.trim().toUpperCase(),
                 name: formData.name.trim(),
                 packSize: formData.packSize.trim(),
-                buyPrice: buyPriceNum,
-                sellPrice: sellPriceNum,
-                price: sellPriceNum,
+                tp: tpNum,
+                price: tpNum,
+                sellPrice: tpNum,
+                buyPrice: tpNum,
               }
             : item
         )
@@ -157,9 +149,10 @@ export default function ProductsPage() {
         code: formData.code.trim().toUpperCase(),
         name: formData.name.trim(),
         packSize: formData.packSize.trim(),
-        buyPrice: buyPriceNum,
-        sellPrice: sellPriceNum,
-        price: sellPriceNum,
+        tp: tpNum,
+        price: tpNum,
+        sellPrice: tpNum,
+        buyPrice: tpNum,
       }
       setProducts((prev) => [newProduct, ...prev])
       setIsCreateOpen(false)
@@ -249,10 +242,7 @@ export default function ProductsPage() {
                     Pack Size
                   </th>
                   <th scope="col" className="px-4 py-3 text-right">
-                    Buy Price (৳)
-                  </th>
-                  <th scope="col" className="px-4 py-3 text-right">
-                    Sell Price (৳)
+                    TP (৳)
                   </th>
                   <th scope="col" className="w-28 px-4 py-3 text-right">
                     Actions
@@ -296,14 +286,9 @@ export default function ProductsPage() {
                         </span>
                       </td>
 
-                      {/* Buy Price */}
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-muted-foreground">
-                        ৳ {(prod.buyPrice ?? Math.round((prod.price || 0) * 0.8)).toLocaleString()}
-                      </td>
-
-                      {/* Sell Price */}
+                      {/* TP */}
                       <td className="px-4 py-3 text-right font-mono font-bold text-foreground">
-                        ৳ {(prod.sellPrice ?? prod.price).toLocaleString()}
+                        ৳ {(prod.tp ?? prod.sellPrice ?? prod.price).toLocaleString()}
                       </td>
 
                       {/* Actions */}
@@ -466,55 +451,28 @@ export default function ProductsPage() {
                 )}
               </div>
 
-              {/* 2-Column Pricing: Buy Price & Sell Price */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                {/* Buy Price (৳) */}
-                <div className="space-y-1.5">
-                  <Label htmlFor="prodBuyPrice" className="text-xs font-medium text-foreground">
-                    Buy Price (৳)
-                  </Label>
-                  <Input
-                    id="prodBuyPrice"
-                    name="prodBuyPrice"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.buyPrice}
-                    onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, buyPrice: e.target.value }))
-                      if (formErrors.buyPrice) setFormErrors((prev) => ({ ...prev, buyPrice: undefined }))
-                    }}
-                    placeholder="e.g. 620"
-                    className={`text-xs font-mono font-semibold ${formErrors.buyPrice ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                  />
-                  {formErrors.buyPrice && (
-                    <p className="text-[11px] text-destructive">{formErrors.buyPrice}</p>
-                  )}
-                </div>
-
-                {/* Sell Price (৳) */}
-                <div className="space-y-1.5">
-                  <Label htmlFor="prodSellPrice" className="text-xs font-medium text-foreground">
-                    Sell Price / TP (৳)
-                  </Label>
-                  <Input
-                    id="prodSellPrice"
-                    name="prodSellPrice"
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={formData.sellPrice}
-                    onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, sellPrice: e.target.value }))
-                      if (formErrors.sellPrice) setFormErrors((prev) => ({ ...prev, sellPrice: undefined }))
-                    }}
-                    placeholder="e.g. 780"
-                    className={`text-xs font-mono font-semibold ${formErrors.sellPrice ? "border-destructive focus-visible:ring-destructive" : ""}`}
-                  />
-                  {formErrors.sellPrice && (
-                    <p className="text-[11px] text-destructive">{formErrors.sellPrice}</p>
-                  )}
-                </div>
+              {/* Pricing: TP (Trade Price) */}
+              <div className="space-y-1.5 pt-1">
+                <Label htmlFor="prodTp" className="text-xs font-medium text-foreground">
+                  TP (৳)
+                </Label>
+                <Input
+                  id="prodTp"
+                  name="prodTp"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={formData.tp}
+                  onChange={(e) => {
+                    setFormData((prev) => ({ ...prev, tp: e.target.value }))
+                    if (formErrors.tp) setFormErrors((prev) => ({ ...prev, tp: undefined }))
+                  }}
+                  placeholder="e.g. 780"
+                  className={`text-xs font-mono font-semibold ${formErrors.tp ? "border-destructive focus-visible:ring-destructive" : ""}`}
+                />
+                {formErrors.tp && (
+                  <p className="text-[11px] text-destructive">{formErrors.tp}</p>
+                )}
               </div>
 
               {/* Actions */}
