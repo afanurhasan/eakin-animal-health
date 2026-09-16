@@ -152,30 +152,6 @@ export default function RMDashboardPage() {
             Supervising Region: <strong className="text-foreground">{rm.areaName}</strong> &bull; Total Area Managers: <strong className="text-foreground">{rmAMs.length}</strong> &bull; MPOs: <strong className="text-foreground">{rmOfficers.length}</strong>
           </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <Link href="/ams">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="cursor-pointer gap-1.5 font-medium shadow-xs"
-            >
-              <UsersRound className="size-4 text-primary" />
-              <span>Area Managers</span>
-            </Button>
-          </Link>
-          <Link href="/orders">
-            <Button
-              type="button"
-              size="sm"
-              className="cursor-pointer gap-1.5 bg-primary text-primary-foreground font-medium shadow-xs hover:bg-primary/90"
-            >
-              <ShoppingCart className="size-4" />
-              <span>Regional Orders</span>
-            </Button>
-          </Link>
-        </div>
       </div>
 
       {/* 4 Core Summary KPI Cards */}
@@ -296,14 +272,14 @@ export default function RMDashboardPage() {
 
         <CardContent className="p-3 sm:p-4">
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-            {/* 1. Regional Territory */}
+            {/* 1. Regional Office */}
             <div className="rounded border border-border/70 bg-muted/20 px-3 py-2 space-y-0.5">
               <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                 <MapPin className="size-3 text-muted-foreground" />
-                Regional Jurisdiction
+                Regional Office
               </span>
               <p className="text-xs font-semibold text-foreground">
-                {rm.areaName}
+                {rm.regionalOfficeName || rm.areaName}
               </p>
             </div>
 

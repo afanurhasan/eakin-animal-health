@@ -209,3 +209,40 @@ export function numberToWords(amount: number): string {
   }
   return text
 }
+
+/**
+ * Returns current date in YYYY-MM-DD local format
+ */
+export function getLocalTodayDateString(): string {
+  const d = new Date()
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, "0")
+  const day = String(d.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Checks if an MPO is active based on Resignation Date.
+ * If resignationDate is empty: active.
+ * If resignationDate exists: active through that date.
+ * Day after resignationDate: no longer active.
+ */
+export function isMPOActive(
+  officer?: { resignationDate?: string } | null,
+  todayDateStr?: string
+): boolean {
+  if (!officer) return false
+  if (!officer.resignationDate || !officer.resignationDate.trim()) return true
+
+  const today = todayDateStr || getLocalTodayDateString()
+  let cleanResign = officer.resignationDate.trim()
+
+  // If in DD/MM/YYYY format, convert to YYYY-MM-DD for standard comparison
+  const ddmmyyyy = cleanResign.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+  if (ddmmyyyy) {
+    cleanResign = `${ddmmyyyy[3]}-${ddmmyyyy[2].padStart(2, "0")}-${ddmmyyyy[1].padStart(2, "0")}`
+  }
+
+  return today <= cleanResign
+}
+

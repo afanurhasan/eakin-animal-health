@@ -969,22 +969,22 @@ export default function ReportsPage() {
       {/* ==================================================== */}
       {/* SECTION 2: REPORT TYPE TABS SELECTOR */}
       {/* ==================================================== */}
-      <div className="flex overflow-x-auto border-b border-border/80 gap-1 pb-1">
+      <div className="grid grid-cols-2 md:grid-cols-4 w-full border-b border-border/80 gap-1.5 pb-1">
         <button
           type="button"
           onClick={() => {
             setActiveReport("sales")
             setCurrentPage(1)
           }}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-t-lg transition-colors cursor-pointer border-b-2 ${
+          className={`flex w-full items-center justify-center gap-2 px-3 py-2.5 text-xs font-semibold rounded-t-lg transition-colors cursor-pointer border-b-2 text-center ${
             activeReport === "sales"
               ? "border-primary text-primary bg-primary/5 font-bold"
               : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"
           }`}
         >
-          <TrendingUp className="size-4" />
-          <span>1. Sales Report</span>
-          <span className="rounded-full bg-muted px-1.5 py-0.2 text-[10px]">
+          <TrendingUp className="size-4 shrink-0" />
+          <span className="truncate">1. Sales Report</span>
+          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] shrink-0">
             {filteredOrders.filter((o) => o.status === "Approved").length}
           </span>
         </button>
@@ -995,15 +995,15 @@ export default function ReportsPage() {
             setActiveReport("collections")
             setCurrentPage(1)
           }}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-t-lg transition-colors cursor-pointer border-b-2 ${
+          className={`flex w-full items-center justify-center gap-2 px-3 py-2.5 text-xs font-semibold rounded-t-lg transition-colors cursor-pointer border-b-2 text-center ${
             activeReport === "collections"
               ? "border-primary text-primary bg-primary/5 font-bold"
               : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"
           }`}
         >
-          <Banknote className="size-4" />
-          <span>2. Collection Report</span>
-          <span className="rounded-full bg-muted px-1.5 py-0.2 text-[10px]">
+          <Banknote className="size-4 shrink-0" />
+          <span className="truncate">2. Collection Report</span>
+          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] shrink-0">
             {filteredCollections.length}
           </span>
         </button>
@@ -1014,15 +1014,15 @@ export default function ReportsPage() {
             setActiveReport("outstanding")
             setCurrentPage(1)
           }}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-t-lg transition-colors cursor-pointer border-b-2 ${
+          className={`flex w-full items-center justify-center gap-2 px-3 py-2.5 text-xs font-semibold rounded-t-lg transition-colors cursor-pointer border-b-2 text-center ${
             activeReport === "outstanding"
               ? "border-primary text-primary bg-primary/5 font-bold"
               : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"
           }`}
         >
-          <AlertCircle className="size-4" />
-          <span>3. Outstanding / Due Report</span>
-          <span className="rounded-full bg-muted px-1.5 py-0.2 text-[10px]">
+          <AlertCircle className="size-4 shrink-0" />
+          <span className="truncate">3. Outstanding / Due Report</span>
+          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] shrink-0">
             {filteredDueCustomers.length}
           </span>
         </button>
@@ -1033,15 +1033,15 @@ export default function ReportsPage() {
             setActiveReport("returns")
             setCurrentPage(1)
           }}
-          className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-t-lg transition-colors cursor-pointer border-b-2 ${
+          className={`flex w-full items-center justify-center gap-2 px-3 py-2.5 text-xs font-semibold rounded-t-lg transition-colors cursor-pointer border-b-2 text-center ${
             activeReport === "returns"
               ? "border-primary text-primary bg-primary/5 font-bold"
               : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"
           }`}
         >
-          <RotateCcw className="size-4" />
-          <span>4. Product Return Report</span>
-          <span className="rounded-full bg-muted px-1.5 py-0.2 text-[10px]">
+          <RotateCcw className="size-4 shrink-0" />
+          <span className="truncate">4. Product Return Report</span>
+          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] shrink-0">
             {filteredReturns.length}
           </span>
         </button>

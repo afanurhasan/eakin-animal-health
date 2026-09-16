@@ -74,6 +74,10 @@ export interface Order {
   officerId: string
   officerCode: string
   officerName: string
+  orderTakenBy?: "MPO" | "AM/RM"
+  takenByName?: string
+  takenById?: string
+  takenByRole?: "mpo" | "am" | "rm"
   depotId: string
   depotName: string
   items: OrderItem[]
@@ -256,6 +260,8 @@ export interface SalesOfficerItem {
   phone: string
   email: string
   pin?: string
+  joiningDate?: string
+  resignationDate?: string
   areaId: string
   areaName: string
   territoryId?: string
@@ -907,6 +913,8 @@ export const initialOfficers: SalesOfficerItem[] = [
     phone: "01711-000111",
     email: "arafat@eakinhealth.com",
     pin: "123456",
+    joiningDate: "2026-09-16",
+    resignationDate: "",
     areaId: "area-1",
     areaName: "Bogura",
     territoryId: "ter-1",
@@ -925,6 +933,8 @@ export const initialOfficers: SalesOfficerItem[] = [
     phone: "01833-445566",
     email: "zakir@eakinhealth.com",
     pin: "123456",
+    joiningDate: "2026-08-01",
+    resignationDate: "",
     areaId: "area-2",
     areaName: "Rangpur",
     territoryId: "ter-6",

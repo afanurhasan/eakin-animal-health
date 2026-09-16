@@ -22,10 +22,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAppState } from "@/lib/store"
+import { isMPOActive } from "@/lib/utils"
 import { type TerritoryItem } from "@/lib/mock-data"
 
 export default function TerritoriesPage() {
   const {
+    currentRole,
+    currentAM,
+    currentRM,
     territories,
     areas,
     regionalOffices,
@@ -91,9 +95,28 @@ export default function TerritoriesPage() {
     )
   }, [depots, formSelectedArea, formRegionalOffice])
 
+  // Base territories based on role
+  const roleBaseTerritories = React.useMemo(() => {
+    if (currentRole === "am" && currentAM) {
+      return territories.filter(
+        (t) =>
+          t.areaId === currentAM.areaId ||
+          (currentAM.areaName && t.areaName?.toLowerCase() === currentAM.areaName?.toLowerCase())
+      )
+    }
+    if (currentRole === "rm" && currentRM) {
+      return territories.filter((t) => {
+        const territoryArea = areas.find((a) => a.id === t.areaId)
+        const roId = t.regionalOfficeId || territoryArea?.regionalOfficeId
+        return roId === currentRM.regionalOfficeId || t.areaId === currentRM.areaId
+      })
+    }
+    return territories
+  }, [territories, currentRole, currentAM, currentRM, areas])
+
   // Filtered territories
   const filteredTerritories = React.useMemo(() => {
-    return territories.filter((t) => {
+    return roleBaseTerritories.filter((t) => {
       const q = searchQuery.toLowerCase().trim()
       const matchesSearch =
         !q ||
@@ -102,15 +125,17 @@ export default function TerritoriesPage() {
         (t.areaName && t.areaName.toLowerCase().includes(q)) ||
         (t.regionalOfficeName && t.regionalOfficeName.toLowerCase().includes(q))
 
-      const matchesArea = selectedAreaFilter === "all" || t.areaId === selectedAreaFilter
+      const matchesArea =
+        currentRole === "am" || selectedAreaFilter === "all" || t.areaId === selectedAreaFilter
 
       const territoryArea = areas.find((a) => a.id === t.areaId)
       const roId = t.regionalOfficeId || territoryArea?.regionalOfficeId
-      const matchesRO = selectedROFilter === "all" || roId === selectedROFilter
+      const matchesRO =
+        currentRole === "am" || selectedROFilter === "all" || roId === selectedROFilter
 
       return matchesSearch && matchesArea && matchesRO
     })
-  }, [territories, areas, searchQuery, selectedAreaFilter, selectedROFilter])
+  }, [roleBaseTerritories, areas, searchQuery, selectedAreaFilter, selectedROFilter, currentRole])
 
   // Open Create Modal
   const handleOpenCreate = () => {
@@ -215,20 +240,26 @@ export default function TerritoriesPage() {
             Territories
           </h2>
           <p className="text-xs text-muted-foreground">
-            Total Territories: <span className="font-semibold text-foreground">{territories.length}</span> across Areas
+            {currentRole === "am" && currentAM
+              ? `Supervised Area: ${currentAM.areaName} (${currentAM.name})`
+              : currentRole === "rm" && currentRM
+              ? `Supervised Regional Office: ${currentRM.regionalOfficeName || currentRM.areaName} (${currentRM.name})`
+              : "Manage territories, assign them to parent areas and track assigned MPOs."}
           </p>
         </div>
 
-        {/* Add Territory Button */}
-        <Button
-          type="button"
-          onClick={handleOpenCreate}
-          size="sm"
-          className="cursor-pointer gap-1.5 font-medium shadow-xs"
-        >
-          <Plus className="size-4" />
-          <span>Add Territory</span>
-        </Button>
+        {/* Add Territory Button (Admin Only) */}
+        {currentRole === "admin" && (
+          <Button
+            type="button"
+            onClick={handleOpenCreate}
+            size="sm"
+            className="cursor-pointer gap-1.5 font-medium shadow-xs"
+          >
+            <Plus className="size-4" />
+            <span>Add Territory</span>
+          </Button>
+        )}
       </div>
 
       {/* Main Table Card with Search & Filters */}
@@ -241,38 +272,46 @@ export default function TerritoriesPage() {
 
             {/* Filter Controls: Area Select, Regional Office Select & Search Bar */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              {/* Area Filter Dropdown */}
-              <div className="flex items-center gap-1.5">
-                <Filter className="size-3.5 text-muted-foreground" />
-                <select
-                  value={selectedAreaFilter}
-                  onChange={(e) => setSelectedAreaFilter(e.target.value)}
-                  className="h-8 rounded-none border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-                >
-                  <option value="all">All Areas</option>
-                  {areas.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {currentRole !== "am" && (
+                <>
+                  {/* Area Filter Dropdown */}
+                  <div className="flex items-center gap-1.5">
+                    <Filter className="size-3.5 text-muted-foreground" />
+                    <select
+                      value={selectedAreaFilter}
+                      onChange={(e) => setSelectedAreaFilter(e.target.value)}
+                      className="h-8 rounded-none border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="all">All Areas</option>
+                      {areas
+                        .filter((a) => currentRole !== "rm" || !currentRM || a.regionalOfficeId === currentRM.regionalOfficeId)
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
 
-              {/* Regional Office Filter Dropdown */}
-              <div className="flex items-center gap-1.5">
-                <select
-                  value={selectedROFilter}
-                  onChange={(e) => setSelectedROFilter(e.target.value)}
-                  className="h-8 rounded-none border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-                >
-                  <option value="all">All Regional Offices</option>
-                  {regionalOffices.map((ro) => (
-                    <option key={ro.id} value={ro.id}>
-                      {ro.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  {/* Regional Office Filter Dropdown (Admin Only) */}
+                  {currentRole === "admin" && (
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        value={selectedROFilter}
+                        onChange={(e) => setSelectedROFilter(e.target.value)}
+                        className="h-8 rounded-none border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="all">All Regional Offices</option>
+                        {regionalOffices.map((ro) => (
+                          <option key={ro.id} value={ro.id}>
+                            {ro.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* Quick Search */}
               <div className="relative w-full sm:w-64">
@@ -315,9 +354,11 @@ export default function TerritoriesPage() {
                   <th scope="col" className="px-4 py-3">
                     Assigned MPOs
                   </th>
-                  <th scope="col" className="px-4 py-3 text-right">
-                    Actions
-                  </th>
+                  {currentRole === "admin" && (
+                    <th scope="col" className="px-4 py-3 text-right">
+                      Actions
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
@@ -335,7 +376,10 @@ export default function TerritoriesPage() {
                     const depotName = depot ? depot.name : ter.depotName || parentArea?.depotName || "-"
 
                     const assignedMPOs = officers.filter(
-                      (o) => o.territoryId === ter.id || (!o.territoryId && o.areaId === ter.areaId && o.code === "MPO-001" && ter.code === "TER-BOG-01")
+                      (o) =>
+                        isMPOActive(o) &&
+                        (o.territoryId === ter.id ||
+                          (!o.territoryId && o.areaId === ter.areaId && o.code === "MPO-001" && ter.code === "TER-BOG-01"))
                     )
 
                     return (
@@ -394,41 +438,43 @@ export default function TerritoriesPage() {
                               ))}
                             </div>
                           ) : (
-                            <span className="text-[11px] text-muted-foreground">No MPO assigned</span>
+                            <span className="text-[11px] text-muted-foreground font-medium">Unassigned</span>
                           )}
                         </td>
 
-                        {/* Actions */}
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={() => handleOpenEdit(ter)}
-                              aria-label={`Edit ${ter.name}`}
-                              className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                            >
-                              <Pencil className="size-3.5" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={() => setDeletingTerritory(ter)}
-                              aria-label={`Delete ${ter.name}`}
-                              className="cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </Button>
-                          </div>
-                        </td>
+                        {/* Actions (Admin Only) */}
+                        {currentRole === "admin" && (
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => handleOpenEdit(ter)}
+                                aria-label={`Edit ${ter.name}`}
+                                className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                              >
+                                <Pencil className="size-3.5" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => setDeletingTerritory(ter)}
+                                aria-label={`Delete ${ter.name}`}
+                                className="cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     )
                   })
                 ) : (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-xs text-muted-foreground">
+                    <td colSpan={currentRole === "admin" ? 8 : 7} className="px-4 py-8 text-center text-xs text-muted-foreground">
                       No territories found matching your filters.
                     </td>
                   </tr>

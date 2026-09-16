@@ -14,6 +14,8 @@ import {
   UserCheck,
   UsersRound,
   User,
+  MapPinned,
+  MapPin,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -63,6 +65,16 @@ export const rmNavItemsConfig: OfficerNavItemConfig[] = [
     icon: LayoutDashboard,
   },
   {
+    title: "Areas",
+    href: "/areas",
+    icon: MapPin,
+  },
+  {
+    title: "Territories",
+    href: "/territories",
+    icon: MapPinned,
+  },
+  {
     title: "AM",
     href: "/ams",
     icon: UsersRound,
@@ -100,6 +112,11 @@ export const amNavItemsConfig: OfficerNavItemConfig[] = [
     title: "Dashboard",
     href: "/officer/am/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Territories",
+    href: "/territories",
+    icon: MapPinned,
   },
   {
     title: "MPOs",

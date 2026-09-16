@@ -34,7 +34,7 @@ import {
   type StockTransfer,
   type StockMovement,
 } from "@/lib/mock-data"
-import { formatDateTime } from "@/lib/utils"
+import { formatDateTime, isMPOActive } from "@/lib/utils"
 
 const STORAGE_KEYS = {
   ORDERS: "eakin_erp_orders_v3",
@@ -152,6 +152,7 @@ interface AppStateContextType {
   // Helpers
   getOfficerAssignedDepot: (officerId: string) => Depot | null
   getOfficerAvailableDepots: (officerId: string) => Depot[]
+  getRMConnectedDepots: (rmId: string) => Depot[]
 }
 
 const AppStateContext = React.createContext<AppStateContextType | undefined>(undefined)
@@ -231,13 +232,15 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (storedOfficers) {
         try {
           let parsedOfficers: SalesOfficerItem[] = JSON.parse(storedOfficers)
-          const validIds = new Set(initialOfficers.map((o) => o.id))
-          if (parsedOfficers.some((o) => !validIds.has(o.id)) || parsedOfficers.length !== initialOfficers.length) {
-            parsedOfficers = initialOfficers
-            localStorage.setItem(STORAGE_KEYS.OFFICERS, JSON.stringify(initialOfficers))
-          }
-          setOfficers(parsedOfficers.map((o) => ({ ...o, pin: o.pin || "123456" })))
-        } catch (_) {}
+          const existingIds = new Set(parsedOfficers.map((o) => o.id))
+          const missingInitial = initialOfficers.filter((o) => !existingIds.has(o.id))
+          const updatedList = [...parsedOfficers, ...missingInitial]
+          setOfficers(updatedList.map((o) => ({ ...o, pin: o.pin || "123456" })))
+        } catch (_) {
+          setOfficers(initialOfficers)
+        }
+      } else {
+        setOfficers(initialOfficers)
       }
 
       const storedAMs = localStorage.getItem(STORAGE_KEYS.AMS)
@@ -472,6 +475,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       })
 
       if (matchedOfficer) {
+        if (!isMPOActive(matchedOfficer)) {
+          return {
+            success: false,
+            error: "Your account is no longer active.",
+          }
+        }
+
         const validPin = matchedOfficer.pin || "123456"
         if (cleanPin !== validPin) {
           return {
@@ -578,6 +588,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           (digits.length >= 10 && o.phone.replace(/\D/g, "") === digits)
       )
       if (found) {
+        if (!isMPOActive(found)) {
+          return null
+        }
         setCurrentRole("officer")
         setCurrentOfficerId(found.id)
         if (typeof window !== "undefined") {
@@ -704,6 +717,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         totalSales: 0,
       }
       setOfficers((prev) => [newOff, ...prev])
+
+      // If assigned to a territory, update customers under that territory to point to this new MPO
+      if (newOff.territoryId) {
+        setCustomers((prev) =>
+          prev.map((c) =>
+            c.territoryId === newOff.territoryId
+              ? { ...c, officerId: newOff.id, officerName: newOff.name }
+              : c
+          )
+        )
+      }
+
       return newOff
     },
     []
@@ -712,6 +737,21 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const updateOfficer = React.useCallback(
     (id: string, updates: Partial<SalesOfficerItem>) => {
       setOfficers((prev) => prev.map((o) => (o.id === id ? { ...o, ...updates } : o)))
+
+      // If territory or name updated, keep customers under that territory aligned
+      if (updates.territoryId || updates.name) {
+        setCustomers((prev) =>
+          prev.map((c) => {
+            if (updates.territoryId && c.territoryId === updates.territoryId) {
+              return { ...c, officerId: id, officerName: updates.name || c.officerName }
+            }
+            if (c.officerId === id && updates.name) {
+              return { ...c, officerName: updates.name }
+            }
+            return c
+          })
+        )
+      }
     },
     []
   )
@@ -884,6 +924,19 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       return depots.length > 0 ? [depots[0]] : []
     },
     [officers, rms, ams, areas, depots]
+  )
+
+  // Helper: Retrieve connected Depots directly for an RM
+  const getRMConnectedDepots = React.useCallback(
+    (rmId: string): Depot[] => {
+      const rm = rms.find((r) => r.id === rmId)
+      if (rm && Array.isArray(rm.depotIds) && rm.depotIds.length > 0) {
+        const connected = depots.filter((d) => rm.depotIds.includes(d.id))
+        if (connected.length > 0) return connected
+      }
+      return depots.length > 0 ? [depots[0]] : []
+    },
+    [rms, depots]
   )
 
   // Helper: Find officer default assigned depot through available depots
@@ -1108,6 +1161,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         addStockMovement,
         getOfficerAssignedDepot,
         getOfficerAvailableDepots,
+        getRMConnectedDepots,
       }}
     >
       {children}

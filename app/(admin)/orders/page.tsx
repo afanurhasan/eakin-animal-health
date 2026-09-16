@@ -45,10 +45,12 @@ import {
   type OrderStatus,
   type BonusOrderItem,
   type SalesOfficerItem,
+  type AMItem,
+  type RMItem,
   type Depot,
   type Product,
 } from "@/lib/mock-data"
-import { formatDateTime, formatDate, numberToWords } from "@/lib/utils"
+import { formatDateTime, formatDate, numberToWords, isMPOActive } from "@/lib/utils"
 import { InvoiceSheet } from "@/components/invoice-sheet"
 
 interface BonusInputRow {
@@ -66,6 +68,8 @@ export default function OrdersPage() {
     areas,
     orders,
     officers,
+    ams,
+    rms,
     depots,
     customers,
     catalog,
@@ -74,6 +78,7 @@ export default function OrdersPage() {
     createOrder,
     getOfficerAssignedDepot,
     getOfficerAvailableDepots,
+    getRMConnectedDepots,
   } = useAppState()
 
   // Restricted Staff (RM, AM, Officer) belong to their single assigned fulfillment depot
@@ -352,9 +357,12 @@ export default function OrdersPage() {
   }
 
   // ==========================================
-  // CREATE ORDER ON BEHALF OF MPO STATES & LOGIC
+  // CREATE ORDER ON BEHALF STATES & LOGIC
   // ==========================================
   const [isCreateModalOpen, setIsCreateModalOpen] = React.useState(false)
+  const [orderTakenBy, setOrderTakenBy] = React.useState<"MPO" | "AM/RM">("MPO")
+  const [selectedStaffRole, setSelectedStaffRole] = React.useState<"am" | "rm">("am")
+  const [selectedStaffId, setSelectedStaffId] = React.useState<string>("")
   const [selectedOfficerId, setSelectedOfficerId] = React.useState<string>("")
   const [officerSearchQuery, setOfficerSearchQuery] = React.useState<string>("")
   const [selectedCustomerId, setSelectedCustomerId] = React.useState<string>("")
@@ -366,22 +374,32 @@ export default function OrdersPage() {
   const [createOrderError, setCreateOrderError] = React.useState<string>("")
   const [isSubmitting, setIsSubmitting] = React.useState(false)
 
-  // Selected Officer
+  // Selected AM or RM (Staff)
+  const selectedStaff = React.useMemo(() => {
+    if (selectedStaffRole === "am") {
+      return ams.find((a) => a.id === selectedStaffId) || ams[0] || null
+    }
+    return rms.find((r) => r.id === selectedStaffId) || rms[0] || null
+  }, [selectedStaffRole, selectedStaffId, ams, rms])
+
+  // Selected Officer (MPO)
   const selectedOfficer = React.useMemo(() => {
     return officers.find((o) => o.id === selectedOfficerId) || null
   }, [officers, selectedOfficerId])
 
-  // Matching Officers for Autocomplete Search
+  // Matching Officers for Autocomplete Search (Only Active MPOs)
   const matchingSearchOfficers = React.useMemo(() => {
     const q = officerSearchQuery.trim().toLowerCase()
     if (!q) return []
-    return officers.filter(
-      (o) =>
-        o.name.toLowerCase().includes(q) ||
-        o.code.toLowerCase().includes(q) ||
-        o.phone.toLowerCase().includes(q) ||
-        (o.areaName && o.areaName.toLowerCase().includes(q))
-    )
+    return officers
+      .filter((o) => isMPOActive(o))
+      .filter(
+        (o) =>
+          o.name.toLowerCase().includes(q) ||
+          o.code.toLowerCase().includes(q) ||
+          o.phone.toLowerCase().includes(q) ||
+          (o.areaName && o.areaName.toLowerCase().includes(q))
+      )
   }, [officers, officerSearchQuery])
 
   // Customers assigned to selected MPO
@@ -392,14 +410,30 @@ export default function OrdersPage() {
 
   // Selected Customer
   const selectedCustomer = React.useMemo(() => {
-    return officerCustomers.find((c) => c.id === selectedCustomerId) || null
-  }, [officerCustomers, selectedCustomerId])
+    if (!selectedCustomerId) return null
+    const sourceList = orderTakenBy === "MPO" ? officerCustomers : customers
+    return sourceList.find((c) => c.id === selectedCustomerId) || null
+  }, [orderTakenBy, officerCustomers, customers, selectedCustomerId])
+
+  // Current Territory MPO for the selected customer
+  const currentTerritoryMPO = React.useMemo(() => {
+    if (!selectedCustomer) return null
+    return (
+      officers.find(
+        (o) =>
+          isMPOActive(o) &&
+          (o.territoryId === selectedCustomer.territoryId ||
+            (selectedCustomer.officerId && o.id === selectedCustomer.officerId))
+      ) || null
+    )
+  }, [selectedCustomer, officers])
 
   // Matching Customers for Autocomplete Search
   const matchingSearchCustomers = React.useMemo(() => {
     const q = customerSearchQuery.trim().toLowerCase()
     if (!q) return []
-    return officerCustomers.filter(
+    const sourceList = orderTakenBy === "MPO" ? officerCustomers : customers
+    return sourceList.filter(
       (c) =>
         c.name.toLowerCase().includes(q) ||
         c.shopName.toLowerCase().includes(q) ||
@@ -407,32 +441,74 @@ export default function OrdersPage() {
         c.phone.toLowerCase().includes(q) ||
         c.address.toLowerCase().includes(q)
     )
-  }, [officerCustomers, customerSearchQuery])
+  }, [orderTakenBy, officerCustomers, customers, customerSearchQuery])
 
-  // Available Depots for Selected MPO
-  const officerAvailableDepots = React.useMemo(() => {
-    if (!selectedOfficerId) return depots
-    return getOfficerAvailableDepots(selectedOfficerId)
-  }, [selectedOfficerId, getOfficerAvailableDepots, depots])
+  // Available Depots for Order
+  const availableDepotsForOrder = React.useMemo(() => {
+    if (orderTakenBy === "MPO") {
+      if (!selectedOfficerId) return depots
+      return getOfficerAvailableDepots(selectedOfficerId)
+    }
 
-  // Sync selected depot when officer or available depots change
-  React.useEffect(() => {
-    if (officerAvailableDepots.length > 0) {
-      if (!selectedDepotId || !officerAvailableDepots.some((d) => d.id === selectedDepotId)) {
-        setSelectedDepotId(officerAvailableDepots[0].id)
+    // AM/RM Flow: Connected depots for the customer's applicable RM
+    if (selectedCustomer) {
+      let rmId = selectedCustomer.rmId
+      if (!rmId && selectedCustomer.areaId) {
+        const area = areas.find((a) => a.id === selectedCustomer.areaId)
+        if (area && area.regionalOfficeId) {
+          const rm = rms.find((r) => r.regionalOfficeId === area.regionalOfficeId)
+          if (rm) rmId = rm.id
+        }
+      }
+      if (rmId) {
+        return getRMConnectedDepots(rmId)
       }
     }
-  }, [officerAvailableDepots, selectedDepotId])
+
+    if (selectedStaffRole === "rm" && selectedStaff) {
+      return getRMConnectedDepots(selectedStaff.id)
+    }
+
+    if (selectedStaffRole === "am" && selectedStaff) {
+      const am = ams.find((a) => a.id === selectedStaff.id)
+      if (am && am.rmId) {
+        return getRMConnectedDepots(am.rmId)
+      }
+    }
+
+    return depots.length > 0 ? [depots[0]] : []
+  }, [
+    orderTakenBy,
+    selectedOfficerId,
+    selectedCustomer,
+    selectedStaffRole,
+    selectedStaff,
+    getOfficerAvailableDepots,
+    getRMConnectedDepots,
+    areas,
+    rms,
+    ams,
+    depots,
+  ])
+
+  // Sync selected depot when order flow or available depots change
+  React.useEffect(() => {
+    if (availableDepotsForOrder.length > 0) {
+      if (!selectedDepotId || !availableDepotsForOrder.some((d) => d.id === selectedDepotId)) {
+        setSelectedDepotId(availableDepotsForOrder[0].id)
+      }
+    }
+  }, [availableDepotsForOrder, selectedDepotId])
 
   // Active Fulfillment Depot
   const activeFulfillmentDepot = React.useMemo(() => {
     return (
-      officerAvailableDepots.find((d) => d.id === selectedDepotId) ||
-      officerAvailableDepots[0] ||
+      availableDepotsForOrder.find((d) => d.id === selectedDepotId) ||
+      availableDepotsForOrder[0] ||
       depots[0] ||
       null
     )
-  }, [officerAvailableDepots, selectedDepotId, depots])
+  }, [availableDepotsForOrder, selectedDepotId, depots])
 
   // Matching Products for Autocomplete Search
   const matchingSearchProducts = React.useMemo(() => {
@@ -490,6 +566,9 @@ export default function OrdersPage() {
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
+    setOrderTakenBy("MPO")
+    setSelectedStaffRole("am")
+    setSelectedStaffId(ams[0]?.id || "")
     setSelectedOfficerId("")
     setOfficerSearchQuery("")
     setSelectedCustomerId("")
@@ -528,6 +607,12 @@ export default function OrdersPage() {
     setSelectedCustomerId(cust.id)
     setCustomerSearchQuery("")
     setCreateOrderError("")
+    if (orderTakenBy === "AM/RM" && cust.rmId) {
+      const connected = getRMConnectedDepots(cust.rmId)
+      if (connected.length > 0) {
+        setSelectedDepotId(connected[0].id)
+      }
+    }
   }
 
   // Reset Customer
@@ -595,17 +680,22 @@ export default function OrdersPage() {
     setCreateOrderError("")
   }
 
-  // Submit Order on Behalf of MPO (Created as Pending)
+  // Submit Order on Behalf (Created as Pending)
   const handleSubmitOnBehalfOrder = (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!selectedOfficer) {
+    if (orderTakenBy === "MPO" && !selectedOfficer) {
       setCreateOrderError("Please search and select the MPO first.")
       return
     }
 
+    if (orderTakenBy === "AM/RM" && !selectedStaff) {
+      setCreateOrderError("Please select the AM or RM who took the order.")
+      return
+    }
+
     if (!selectedCustomer) {
-      setCreateOrderError("Please search and select an assigned customer for this MPO.")
+      setCreateOrderError("Please search and select a customer.")
       return
     }
 
@@ -626,6 +716,20 @@ export default function OrdersPage() {
 
     setIsSubmitting(true)
 
+    const isAMRM = orderTakenBy === "AM/RM"
+    const officerId = isAMRM
+      ? (currentTerritoryMPO ? currentTerritoryMPO.id : "")
+      : selectedOfficer!.id
+    const officerCode = isAMRM
+      ? (currentTerritoryMPO ? currentTerritoryMPO.code : "-")
+      : selectedOfficer!.code
+    const officerName = isAMRM
+      ? (currentTerritoryMPO ? currentTerritoryMPO.name : "Unassigned")
+      : selectedOfficer!.name
+    const takenByName = isAMRM ? selectedStaff!.name : selectedOfficer!.name
+    const takenById = isAMRM ? selectedStaff!.id : selectedOfficer!.id
+    const takenByRole = isAMRM ? selectedStaffRole : "mpo"
+
     const created = createOrder({
       customerId: selectedCustomer.id,
       customerCode: selectedCustomer.code,
@@ -633,9 +737,13 @@ export default function OrdersPage() {
       shopName: selectedCustomer.shopName,
       phone: selectedCustomer.phone,
       address: selectedCustomer.address,
-      officerId: selectedOfficer.id,
-      officerCode: selectedOfficer.code,
-      officerName: selectedOfficer.name,
+      officerId,
+      officerCode,
+      officerName,
+      orderTakenBy,
+      takenByName,
+      takenById,
+      takenByRole,
       depotId: activeFulfillmentDepot.id,
       depotName: activeFulfillmentDepot.name,
       items: calculatedNewOrder.items,
@@ -650,7 +758,17 @@ export default function OrdersPage() {
 
     setIsSubmitting(false)
     setIsCreateModalOpen(false)
-    showToast(`Order ${created.code} created on behalf of ${selectedOfficer.name}! (Status: Pending)`, "success")
+    if (isAMRM) {
+      showToast(
+        `Order ${created.code} created on behalf of ${takenByName} (${selectedStaffRole.toUpperCase()})! (Status: Pending)`,
+        "success"
+      )
+    } else {
+      showToast(
+        `Order ${created.code} created on behalf of ${selectedOfficer!.name}! (Status: Pending)`,
+        "success"
+      )
+    }
   }
 
   return (
@@ -685,7 +803,7 @@ export default function OrdersPage() {
           </p>
         </div>
 
-        {/* Create Order on Behalf of MPO Button (Admin only) */}
+        {/* Create Order on Behalf Button (Admin only) */}
         {currentRole === "admin" && (
           <Button
             type="button"
@@ -693,7 +811,7 @@ export default function OrdersPage() {
             className="cursor-pointer bg-primary text-primary-foreground font-semibold hover:bg-primary/90 shadow-xs flex items-center gap-2 self-start sm:self-auto text-xs sm:text-sm h-9 px-3.5"
           >
             <Plus className="size-4" />
-            <span>Create Order on Behalf of MPO</span>
+            <span>Create Order on Behalf</span>
           </Button>
         )}
       </div>
@@ -878,10 +996,23 @@ export default function OrdersPage() {
                           <div className="text-[11px] text-muted-foreground">{order.shopName}</div>
                         </td>
 
-                        {/* Sales Officer */}
+                        {/* Sales Officer / Order Taken By */}
                         <td className="px-4 py-3 text-muted-foreground">
-                          <div className="font-medium text-foreground">{order.officerName}</div>
-                          <div className="text-[10px] text-muted-foreground font-mono">{order.officerCode}</div>
+                          {order.orderTakenBy === "AM/RM" ? (
+                            <div>
+                              <div className="font-medium text-foreground">{order.officerName || "Unassigned"}</div>
+                              <div className="text-[10px] text-muted-foreground">
+                                Taken by: <strong className="text-foreground">{order.takenByName || "AM/RM"}</strong>
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="font-medium text-foreground">{order.officerName}</div>
+                              {order.officerCode && order.officerCode !== "-" && (
+                                <div className="text-[10px] text-muted-foreground font-mono">{order.officerCode}</div>
+                              )}
+                            </div>
+                          )}
                         </td>
 
                         {/* Order Total */}
@@ -1153,79 +1284,83 @@ export default function OrdersPage() {
                     <div className="font-medium text-foreground">
                       Proprietor: {approvingOrder.customerName}
                     </div>
-                    <div className="flex items-center gap-1.5 text-muted-foreground font-mono text-[11px]">
-                      <Store className="size-3 text-muted-foreground" />
+                    <div className="flex items-center gap-1.5 text-black font-mono text-[11px]">
+                      <Store className="size-3 text-black" />
                       <span>Customer Code: {approvingOrder.customerCode}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-muted-foreground font-mono text-[11px]">
-                      <Phone className="size-3 text-muted-foreground" />
+                    <div className="flex items-center gap-1.5 text-black font-mono text-[11px]">
+                      <Phone className="size-3 text-black" />
                       <span>{approvingOrder.phone}</span>
                     </div>
-                    <div className="flex items-start gap-1.5 text-muted-foreground text-[11px]">
-                      <MapPin className="size-3 text-muted-foreground mt-0.5 shrink-0" />
+                    <div className="flex items-start gap-1.5 text-black text-[11px]">
+                      <MapPin className="size-3 text-black mt-0.5 shrink-0" />
                       <span>{approvingOrder.address}</span>
                     </div>
                   </div>
 
                   {/* Sales Officer & Depot Details */}
                   <div className="space-y-1.5 sm:pl-2">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-black">
                       Fulfillment & Representative
                     </div>
                     <div className="text-xs">
-                      <span className="text-muted-foreground">MPO: </span>
-                      <span className="font-semibold text-foreground">{approvingOrder.officerName}</span>
-                      <span className="ml-1 font-mono text-[10px] text-muted-foreground">({approvingOrder.officerCode})</span>
+                      <span className="text-black">MPO: </span>
+                      <span className="font-semibold text-black">
+                        {approvingOrder.orderTakenBy === "AM/RM" ? "Vacant" : approvingOrder.officerName}
+                      </span>
+                      {approvingOrder.orderTakenBy !== "AM/RM" && approvingOrder.officerCode && approvingOrder.officerCode !== "-" && (
+                        <span className="ml-1 font-mono text-[10px] text-black">({approvingOrder.officerCode})</span>
+                      )}
                     </div>
                     <div className="text-xs">
-                      <span className="text-muted-foreground">Fulfillment Depot: </span>
-                      <span className="font-semibold text-foreground">{approvingOrder.depotName}</span>
+                      <span className="text-black">Fulfillment Depot: </span>
+                      <span className="font-semibold text-black">{approvingOrder.depotName}</span>
                     </div>
                     <div className="text-xs">
-                      <span className="text-muted-foreground">Order Items: </span>
-                      <span className="font-medium text-foreground">{approvingOrder.items.length} Products ({approvingOrder.totalItems} Units)</span>
+                      <span className="text-black">Order Items: </span>
+                      <span className="font-medium text-black">{approvingOrder.items.length} Products ({approvingOrder.totalItems} Units)</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Purchased Products Table */}
                 <div className="space-y-2">
-                  <div className="text-xs font-semibold text-foreground">Purchased Products</div>
+                  <div className="text-xs font-semibold text-black">Purchased Products</div>
                   <div className="overflow-x-auto rounded border border-border bg-card">
                     <table className="w-full text-left text-xs">
-                      <thead className="border-b border-border bg-muted/50 text-[11px] font-semibold text-muted-foreground uppercase">
+                      <thead className="border-b border-border bg-muted/50 text-[11px] font-semibold text-black uppercase">
                         <tr>
-                          <th scope="col" className="w-10 px-3 py-2 text-center">SL</th>
-                          <th scope="col" className="px-3 py-2">Product Code</th>
-                          <th scope="col" className="px-3 py-2">Product Name</th>
-                          <th scope="col" className="px-3 py-2">Pack Size</th>
-                          <th scope="col" className="px-3 py-2 text-center">Quantity</th>
-                          <th scope="col" className="px-3 py-2 text-right">TP (৳)</th>
-                          <th scope="col" className="px-3 py-2 text-right">Total (৳)</th>
+                          <th scope="col" className="w-10 px-3 py-2 text-center text-black">SL</th>
+                          <th scope="col" className="px-3 py-2 text-black">Product Code</th>
+                          <th scope="col" className="px-3 py-2 text-black">Product Name</th>
+                          <th scope="col" className="px-3 py-2 text-black">Pack Size</th>
+                          <th scope="col" className="px-3 py-2 text-center text-black">Quantity</th>
+                          <th scope="col" className="px-3 py-2 text-right text-black">TP (৳)</th>
+                          <th scope="col" className="px-3 py-2 text-right text-black">Total (৳)</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/60">
                         {approvingOrder.items.map((item, idx) => (
                           <tr key={item.id} className="transition-colors hover:bg-muted/20">
-                            <td className="px-3 py-2 text-center font-medium text-muted-foreground font-mono">
+                            <td className="px-3 py-2 text-center font-medium text-black font-mono">
                               {idx + 1}
                             </td>
                             <td className="px-3 py-2 font-mono text-[11px] font-medium text-primary">
                               {item.productCode}
                             </td>
-                            <td className="px-3 py-2 font-semibold text-foreground">
+                            <td className="px-3 py-2 font-semibold text-black">
                               {item.productName}
                             </td>
-                            <td className="px-3 py-2 text-muted-foreground">
+                            <td className="px-3 py-2 text-black">
                               {item.packSize}
                             </td>
-                            <td className="px-3 py-2 text-center font-mono font-bold text-foreground">
+                            <td className="px-3 py-2 text-center font-mono font-bold text-black">
                               {item.quantity}
                             </td>
-                            <td className="px-3 py-2 text-right font-mono text-muted-foreground">
+                            <td className="px-3 py-2 text-right font-mono text-black">
                               ৳ {item.unitPrice.toLocaleString()}
                             </td>
-                            <td className="px-3 py-2 text-right font-mono font-bold text-foreground">
+                            <td className="px-3 py-2 text-right font-mono font-bold text-black">
                               ৳ {item.totalPrice.toLocaleString()}
                             </td>
                           </tr>
@@ -1591,10 +1726,10 @@ export default function OrdersPage() {
                 </div>
                 <div>
                   <h3 id="create-behalf-order-title" className="text-sm font-bold text-foreground">
-                    Create Order on Behalf of MPO
+                    Create Order on Behalf
                   </h3>
                   <p className="text-[11px] text-muted-foreground">
-                    Search MPO, select customer, search & add multiple products to submit a pending order.
+                    Create order on behalf of an active MPO or directly via AM/RM.
                   </p>
                 </div>
               </div>
@@ -1619,298 +1754,652 @@ export default function OrdersPage() {
                 </div>
               )}
 
-              {/* Step 1: MPO (Sales Officer) Selection */}
-              {!selectedOfficer ? (
-                <div className="space-y-2 rounded-lg border border-border bg-muted/10 p-4">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <UserCheck className="size-3.5 text-primary" />
-                      Step 1: Search & Select MPO *
-                    </Label>
-                    <span className="text-[11px] text-muted-foreground">
-                      {officers.length} active MPOs in system
-                    </span>
-                  </div>
+              {/* Order Source: Order Taken By */}
+              <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3.5">
+                <Label className="text-xs font-bold text-foreground uppercase tracking-wider block">
+                  Order Taken By *
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (orderTakenBy !== "MPO") {
+                        setOrderTakenBy("MPO")
+                        setSelectedCustomerId("")
+                        setCustomerSearchQuery("")
+                        setCreateOrderError("")
+                      }
+                    }}
+                    className={`flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold transition-all cursor-pointer ${
+                      orderTakenBy === "MPO"
+                        ? "border-primary bg-primary text-primary-foreground shadow-xs"
+                        : "border-border bg-card text-foreground hover:bg-muted/60"
+                    }`}
+                  >
+                    <UserCheck className="size-3.5" />
+                    <span>MPO</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (orderTakenBy !== "AM/RM") {
+                        setOrderTakenBy("AM/RM")
+                        setSelectedCustomerId("")
+                        setCustomerSearchQuery("")
+                        setCreateOrderError("")
+                      }
+                    }}
+                    className={`flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold transition-all cursor-pointer ${
+                      orderTakenBy === "AM/RM"
+                        ? "border-primary bg-primary text-primary-foreground shadow-xs"
+                        : "border-border bg-card text-foreground hover:bg-muted/60"
+                    }`}
+                  >
+                    <Building2 className="size-3.5" />
+                    <span>AM / RM</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {orderTakenBy === "MPO"
+                    ? "Standard order flow: Select an active MPO taking order for their assigned customer."
+                    : "Order taken by Area Manager or Regional Manager when Territory MPO has resigned or is unassigned."}
+                </p>
+              </div>
 
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      autoFocus
-                      placeholder="Type MPO name, officer code (e.g. OFF-001), phone, or area..."
-                      value={officerSearchQuery}
-                      onChange={(e) => setOfficerSearchQuery(e.target.value)}
-                      className="pl-9 text-xs"
-                    />
+              {/* ---------------------------------------------------- */}
+              {/* FLOW A: ORDER TAKEN BY MPO                           */}
+              {/* ---------------------------------------------------- */}
+              {orderTakenBy === "MPO" && (
+                <>
+                  {/* Step 1: MPO (Sales Officer) Selection */}
+                  {!selectedOfficer ? (
+                    <div className="space-y-2 rounded-lg border border-border bg-muted/10 p-4">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                          <UserCheck className="size-3.5 text-primary" />
+                          Step 1: Search & Select MPO *
+                        </Label>
+                        <span className="text-[11px] text-muted-foreground">
+                          {officers.filter((o) => isMPOActive(o)).length} active MPOs
+                        </span>
+                      </div>
 
-                    {/* MPO Autocomplete Dropdown List */}
-                    {officerSearchQuery.trim() && (
-                      <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-lg border border-border bg-card shadow-xl">
-                        {matchingSearchOfficers.length === 0 ? (
-                          <div className="p-4 text-center text-xs text-muted-foreground">
-                            No MPO found matching &ldquo;{officerSearchQuery}&rdquo;.
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          autoFocus
+                          placeholder="Type MPO name, officer code (e.g. OFF-001), phone, or area..."
+                          value={officerSearchQuery}
+                          onChange={(e) => setOfficerSearchQuery(e.target.value)}
+                          className="pl-9 text-xs"
+                        />
+
+                        {/* MPO Autocomplete Dropdown List */}
+                        {officerSearchQuery.trim() && (
+                          <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-lg border border-border bg-card shadow-xl">
+                            {matchingSearchOfficers.length === 0 ? (
+                              <div className="p-4 text-center text-xs text-muted-foreground">
+                                No active MPO found matching &ldquo;{officerSearchQuery}&rdquo;.
+                              </div>
+                            ) : (
+                              matchingSearchOfficers.map((off) => (
+                                <button
+                                  key={off.id}
+                                  type="button"
+                                  onClick={() => handleSelectOfficer(off)}
+                                  className="w-full flex items-center justify-between p-3 text-left text-xs transition-colors hover:bg-muted/50 border-b border-border/50 last:border-0 cursor-pointer"
+                                >
+                                  <div>
+                                    <div className="font-bold text-foreground text-xs">{off.name}</div>
+                                    <div className="text-muted-foreground flex items-center gap-1.5 mt-0.5 text-[11px]">
+                                      <span className="font-mono text-primary font-semibold">{off.code}</span>
+                                      <span>&bull;</span>
+                                      <span>{off.areaName || "Assigned Area"}</span>
+                                    </div>
+                                    <div className="text-muted-foreground text-[10px] mt-0.5">
+                                      {off.phone} &bull; {off.email}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-[10px] text-muted-foreground uppercase font-medium block">
+                                      Lifetime Orders
+                                    </span>
+                                    <span className="font-bold text-foreground font-mono text-xs">
+                                      {off.totalOrders} Orders
+                                    </span>
+                                  </div>
+                                </button>
+                              ))
+                            )}
                           </div>
-                        ) : (
-                          matchingSearchOfficers.map((off) => (
-                            <button
-                              key={off.id}
-                              type="button"
-                              onClick={() => handleSelectOfficer(off)}
-                              className="w-full flex items-center justify-between p-3 text-left text-xs transition-colors hover:bg-muted/50 border-b border-border/50 last:border-0 cursor-pointer"
-                            >
-                              <div>
-                                <div className="font-bold text-foreground text-xs">{off.name}</div>
-                                <div className="text-muted-foreground flex items-center gap-1.5 mt-0.5 text-[11px]">
-                                  <span className="font-mono text-primary font-semibold">{off.code}</span>
-                                  <span>&bull;</span>
-                                  <span>{off.areaName || "Assigned Area"}</span>
-                                </div>
-                                <div className="text-muted-foreground text-[10px] mt-0.5">
-                                  {off.phone} &bull; {off.email}
-                                </div>
-                              </div>
-                              <div className="text-right">
-                                <span className="text-[10px] text-muted-foreground uppercase font-medium block">
-                                  Lifetime Orders
-                                </span>
-                                <span className="font-bold text-foreground font-mono text-xs">
-                                  {off.totalOrders} Orders
-                                </span>
-                              </div>
-                            </button>
-                          ))
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                /* Selected MPO Snapshot Banner */
-                <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3 text-xs">
-                  <div className="flex items-center justify-between border-b border-primary/10 pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                        <CheckCircle2 className="size-3.5 text-primary" />
-                        MPO Selected
-                      </span>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleResetOfficer}
-                      className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-primary/10 flex items-center gap-1 cursor-pointer"
-                    >
-                      <RefreshCw className="size-3" />
-                      <span>Change MPO</span>
-                    </Button>
-                  </div>
+                  ) : (
+                    /* Selected MPO Snapshot Banner */
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3 text-xs">
+                      <div className="flex items-center justify-between border-b border-primary/10 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                            <CheckCircle2 className="size-3.5 text-primary" />
+                            MPO Selected
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleResetOfficer}
+                          className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-primary/10 flex items-center gap-1 cursor-pointer"
+                        >
+                          <RefreshCw className="size-3" />
+                          <span>Change MPO</span>
+                        </Button>
+                      </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <span className="text-muted-foreground block uppercase font-medium text-[10px]">
-                        MPO Officer
-                      </span>
-                      <span className="font-bold text-foreground text-xs mt-0.5 block">
-                        {selectedOfficer.name}
-                      </span>
-                      <span className="text-muted-foreground text-[11px] font-mono">
-                        Code: <strong className="text-primary">{selectedOfficer.code}</strong>
-                      </span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <span className="text-muted-foreground block uppercase font-medium text-[10px]">
+                            MPO Officer
+                          </span>
+                          <span className="font-bold text-foreground text-xs mt-0.5 block">
+                            {selectedOfficer.name}
+                          </span>
+                          <span className="text-muted-foreground text-[11px] font-mono">
+                            Code: <strong className="text-primary">{selectedOfficer.code}</strong>
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-muted-foreground block uppercase font-medium text-[10px]">
+                            Assigned Area & Contact
+                          </span>
+                          <span className="text-foreground text-xs font-medium mt-0.5 block">
+                            {selectedOfficer.areaName || "Main Territory"}
+                          </span>
+                          <span className="text-muted-foreground text-[11px] font-mono">
+                            {selectedOfficer.phone}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-muted-foreground block uppercase font-medium text-[10px]">
+                            Assigned RM / Depot
+                          </span>
+                          <span className="font-semibold text-foreground text-xs mt-0.5 block">
+                            {selectedOfficer.rmName || "Regional Manager"}
+                          </span>
+                          <span className="text-muted-foreground text-[11px]">
+                            Depot: {activeFulfillmentDepot?.name || "Primary Depot"}
+                          </span>
+                        </div>
+                      </div>
                     </div>
+                  )}
 
-                    <div>
-                      <span className="text-muted-foreground block uppercase font-medium text-[10px]">
-                        Assigned Area & Contact
-                      </span>
-                      <span className="text-foreground text-xs font-medium mt-0.5 block">
-                        {selectedOfficer.areaName || "Main Territory"}
-                      </span>
-                      <span className="text-muted-foreground text-[11px] font-mono">
-                        {selectedOfficer.phone}
-                      </span>
-                    </div>
+                  {/* Step 2: Customer Selection for MPO */}
+                  {selectedOfficer && (
+                    !selectedCustomer ? (
+                      <div className="space-y-2 rounded-lg border border-border bg-muted/10 p-4">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                            <User className="size-3.5 text-primary" />
+                            Step 2: Search & Select Customer *
+                          </Label>
+                          <span className="text-[11px] text-muted-foreground">
+                            {officerCustomers.length} assigned customers for {selectedOfficer.name}
+                          </span>
+                        </div>
 
-                    <div>
-                      <span className="text-muted-foreground block uppercase font-medium text-[10px]">
-                        Assigned RM / Depot
-                      </span>
-                      <span className="font-semibold text-foreground text-xs mt-0.5 block">
-                        {selectedOfficer.rmName || "Regional Manager"}
-                      </span>
-                      <span className="text-muted-foreground text-[11px]">
-                        Depot: {activeFulfillmentDepot?.name || "Primary Depot"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
+                        <div className="relative">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                          <Input
+                            autoFocus
+                            placeholder="Type customer name, shop name, phone, or customer code..."
+                            value={customerSearchQuery}
+                            onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                            className="pl-9 text-xs"
+                          />
 
-              {/* Step 2: Customer Selection (Search Autocomplete & Snapshot Banner) */}
-              {selectedOfficer && (
-                !selectedCustomer ? (
-                  <div className="space-y-2 rounded-lg border border-border bg-muted/10 p-4">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <User className="size-3.5 text-primary" />
-                        Step 2: Search & Select Customer *
-                      </Label>
-                      <span className="text-[11px] text-muted-foreground">
-                        {officerCustomers.length} assigned customers for {selectedOfficer.name}
-                      </span>
-                    </div>
-
-                    <div className="relative">
-                      <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        autoFocus
-                        placeholder="Type customer name, shop name, phone, or customer code..."
-                        value={customerSearchQuery}
-                        onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                        className="pl-9 text-xs"
-                      />
-
-                      {/* Customer Autocomplete Dropdown List */}
-                      {customerSearchQuery.trim() && (
-                        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-lg border border-border bg-card shadow-xl">
-                          {matchingSearchCustomers.length === 0 ? (
-                            <div className="p-4 text-center text-xs text-muted-foreground">
-                              No assigned customers found matching &ldquo;{customerSearchQuery}&rdquo;.
+                          {/* Customer Autocomplete Dropdown List */}
+                          {customerSearchQuery.trim() && (
+                            <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-lg border border-border bg-card shadow-xl">
+                              {matchingSearchCustomers.length === 0 ? (
+                                <div className="p-4 text-center text-xs text-muted-foreground">
+                                  No assigned customers found matching &ldquo;{customerSearchQuery}&rdquo;.
+                                </div>
+                              ) : (
+                                matchingSearchCustomers.map((cust) => (
+                                  <button
+                                    key={cust.id}
+                                    type="button"
+                                    onClick={() => handleSelectCustomer(cust)}
+                                    className="w-full flex items-center justify-between p-3 text-left text-xs transition-colors hover:bg-muted/50 border-b border-border/50 last:border-0 cursor-pointer"
+                                  >
+                                    <div>
+                                      <div className="font-bold text-foreground text-xs">{cust.name}</div>
+                                      <div className="text-muted-foreground flex items-center gap-1.5 mt-0.5 text-[11px]">
+                                        <Store className="size-3 text-muted-foreground" />
+                                        <span className="font-semibold text-foreground">{cust.shopName}</span>
+                                        <span>&bull;</span>
+                                        <span className="font-mono text-primary font-medium">{cust.code}</span>
+                                      </div>
+                                      <div className="text-muted-foreground text-[10px] mt-0.5">
+                                        {cust.phone} &bull; {cust.address}
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <span className="text-[10px] text-muted-foreground uppercase font-medium block">
+                                        Outstanding
+                                      </span>
+                                      <span className="font-bold text-amber-700 dark:text-amber-400 font-mono text-xs">
+                                        ৳ {(cust.outstandingBalance || 0).toLocaleString()}
+                                      </span>
+                                    </div>
+                                  </button>
+                                ))
+                              )}
                             </div>
-                          ) : (
-                            matchingSearchCustomers.map((cust) => (
-                              <button
-                                key={cust.id}
-                                type="button"
-                                onClick={() => handleSelectCustomer(cust)}
-                                className="w-full flex items-center justify-between p-3 text-left text-xs transition-colors hover:bg-muted/50 border-b border-border/50 last:border-0 cursor-pointer"
-                              >
-                                <div>
-                                  <div className="font-bold text-foreground text-xs">{cust.name}</div>
-                                  <div className="text-muted-foreground flex items-center gap-1.5 mt-0.5 text-[11px]">
-                                    <Store className="size-3 text-muted-foreground" />
-                                    <span className="font-semibold text-foreground">{cust.shopName}</span>
-                                    <span>&bull;</span>
-                                    <span className="font-mono text-primary font-medium">{cust.code}</span>
-                                  </div>
-                                  <div className="text-muted-foreground text-[10px] mt-0.5">
-                                    {cust.phone} &bull; {cust.address}
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <span className="text-[10px] text-muted-foreground uppercase font-medium block">
-                                    Outstanding
-                                  </span>
-                                  <span className="font-bold text-amber-700 dark:text-amber-400 font-mono text-xs">
-                                    ৳ {(cust.outstandingBalance || 0).toLocaleString()}
-                                  </span>
-                                </div>
-                              </button>
-                            ))
                           )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  /* Customer Selected Snapshot Banner */
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3 text-xs">
-                    <div className="flex items-center justify-between border-b border-primary/10 pb-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                          <CheckCircle2 className="size-3.5 text-primary" />
-                          Customer Selected
-                        </span>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleResetCustomer}
-                        className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-primary/10 flex items-center gap-1 cursor-pointer"
-                      >
-                        <RefreshCw className="size-3" />
-                        <span>Change Customer</span>
-                      </Button>
-                    </div>
+                    ) : (
+                      /* Customer Selected Snapshot Banner */
+                      <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3 text-xs">
+                        <div className="flex items-center justify-between border-b border-primary/10 pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                              <CheckCircle2 className="size-3.5 text-primary" />
+                              Customer Selected
+                            </span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleResetCustomer}
+                            className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-primary/10 flex items-center gap-1 cursor-pointer"
+                          >
+                            <RefreshCw className="size-3" />
+                            <span>Change Customer</span>
+                          </Button>
+                        </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <span className="text-muted-foreground block uppercase font-medium text-[10px]">
-                          Customer & Shop
-                        </span>
-                        <span className="font-bold text-foreground text-xs mt-0.5 block">
-                          {selectedCustomer.shopName}
-                        </span>
-                        <span className="text-muted-foreground text-[11px]">
-                          Proprietor: <strong className="text-foreground">{selectedCustomer.name}</strong> (
-                          <span className="font-mono text-primary">{selectedCustomer.code}</span>)
-                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <span className="text-muted-foreground block uppercase font-medium text-[10px]">
+                              Customer & Shop
+                            </span>
+                            <span className="font-bold text-foreground text-xs mt-0.5 block">
+                              {selectedCustomer.shopName}
+                            </span>
+                            <span className="text-muted-foreground text-[11px]">
+                              Proprietor: <strong className="text-foreground">{selectedCustomer.name}</strong> (
+                              <span className="font-mono text-primary">{selectedCustomer.code}</span>)
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="text-muted-foreground block uppercase font-medium text-[10px]">
+                              Contact & Region
+                            </span>
+                            <span className="text-foreground text-xs font-mono mt-0.5 block">
+                              {selectedCustomer.phone}
+                            </span>
+                            <span className="text-muted-foreground text-[11px] block truncate">
+                              Area: <strong className="text-foreground">{selectedCustomer.areaName || selectedOfficer?.areaName}</strong>
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="text-muted-foreground block uppercase font-medium text-[10px]">
+                              Current Outstanding Balance
+                            </span>
+                            <span className="font-bold text-amber-700 dark:text-amber-400 text-sm font-mono mt-0.5 block">
+                              ৳ {(selectedCustomer.outstandingBalance || 0).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  )}
+
+                  {/* Step 3: Fulfillment Depot Selection */}
+                  {selectedOfficer && (
+                    <div className="rounded-lg border border-border bg-card p-4 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                        <div>
+                          <Label htmlFor="behalf-order-depot-select" className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                            <Building2 className="size-3.5 text-primary" />
+                            Fulfillment Depot *
+                          </Label>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            Select which depot fulfills this order. Live product availability below is based on this depot&apos;s stock.
+                          </p>
+                        </div>
+                        {availableDepotsForOrder.length > 1 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-[10px] font-semibold text-primary w-fit">
+                            {availableDepotsForOrder.length} RM Depots Available
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground w-fit">
+                            Primary RM Depot
+                          </span>
+                        )}
                       </div>
 
-                      <div>
-                        <span className="text-muted-foreground block uppercase font-medium text-[10px]">
-                          Contact & Region
-                        </span>
-                        <span className="text-foreground text-xs font-mono mt-0.5 block">
-                          {selectedCustomer.phone}
-                        </span>
-                        <span className="text-muted-foreground text-[11px] block truncate">
-                          Area: <strong className="text-foreground">{selectedCustomer.areaName || selectedOfficer?.areaName}</strong>
-                        </span>
-                      </div>
-
-                      <div>
-                        <span className="text-muted-foreground block uppercase font-medium text-[10px]">
-                          Current Outstanding Balance
-                        </span>
-                        <span className="font-bold text-amber-700 dark:text-amber-400 text-sm font-mono mt-0.5 block">
-                          ৳ {(selectedCustomer.outstandingBalance || 0).toLocaleString()}
-                        </span>
+                      <div className="pt-1">
+                        <select
+                          id="behalf-order-depot-select"
+                          value={selectedDepotId}
+                          onChange={(e) => setSelectedDepotId(e.target.value)}
+                          className="w-full h-9 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary font-medium"
+                        >
+                          {availableDepotsForOrder.map((depot) => (
+                            <option key={depot.id} value={depot.id}>
+                              {depot.name} ({depot.code}) - {depot.location}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                  </div>
-                )
+                  )}
+                </>
               )}
 
-              {/* Step 3: Fulfillment Depot Selection */}
-              {selectedOfficer && (
-                <div className="rounded-lg border border-border bg-card p-4 space-y-2.5">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                    <div>
-                      <Label htmlFor="behalf-order-depot-select" className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Building2 className="size-3.5 text-primary" />
-                        Fulfillment Depot *
+              {/* ---------------------------------------------------- */}
+              {/* FLOW B: ORDER TAKEN BY AM / RM                       */}
+              {/* ---------------------------------------------------- */}
+              {orderTakenBy === "AM/RM" && (
+                <>
+                  {/* Step 1: AM or RM Selection */}
+                  <div className="space-y-3 rounded-lg border border-border bg-muted/10 p-4">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <UserCheck className="size-3.5 text-primary" />
+                        Step 1: Select AM or RM who took the order *
                       </Label>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Select which depot fulfills this order. Live product availability below is based on this depot&apos;s stock.
-                      </p>
                     </div>
-                    {officerAvailableDepots.length > 1 ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-[10px] font-semibold text-primary w-fit">
-                        {officerAvailableDepots.length} RM Depots Available
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground w-fit">
-                        Primary RM Depot
-                      </span>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-[11px] font-medium text-muted-foreground">
+                          Staff Type
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedStaffRole("am")
+                              setSelectedStaffId(ams[0]?.id || "")
+                            }}
+                            className={`rounded border px-2.5 py-1.5 text-xs font-medium cursor-pointer transition-colors ${
+                              selectedStaffRole === "am"
+                                ? "border-primary bg-primary/10 text-primary font-semibold"
+                                : "border-border bg-card text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            Area Manager (AM)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedStaffRole("rm")
+                              setSelectedStaffId(rms[0]?.id || "")
+                            }}
+                            className={`rounded border px-2.5 py-1.5 text-xs font-medium cursor-pointer transition-colors ${
+                              selectedStaffRole === "rm"
+                                ? "border-primary bg-primary/10 text-primary font-semibold"
+                                : "border-border bg-card text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            Regional Manager (RM)
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="staff-select" className="text-[11px] font-medium text-muted-foreground">
+                          Select {selectedStaffRole === "am" ? "Area Manager (AM)" : "Regional Manager (RM)"}
+                        </Label>
+                        <select
+                          id="staff-select"
+                          value={selectedStaff?.id || ""}
+                          onChange={(e) => setSelectedStaffId(e.target.value)}
+                          className="w-full h-8.5 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary font-medium"
+                        >
+                          {selectedStaffRole === "am"
+                            ? ams.map((am) => (
+                                <option key={am.id} value={am.id}>
+                                  {am.name} ({am.code}) - {am.areaName}
+                                </option>
+                              ))
+                            : rms.map((rm) => (
+                                <option key={rm.id} value={rm.id}>
+                                  {rm.name} ({rm.code}) - {rm.regionalOfficeName}
+                                </option>
+                              ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Selected AM/RM Banner */}
+                    {selectedStaff && (
+                      <div className="rounded-md border border-border/80 bg-card p-3 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-primary tracking-wide">
+                            {selectedStaffRole.toUpperCase()} Representative
+                          </span>
+                          <div className="font-bold text-foreground text-xs mt-0.5">
+                            {selectedStaff.name}{" "}
+                            <span className="font-mono text-muted-foreground font-normal">({selectedStaff.code})</span>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground mt-0.5">
+                            Phone: {selectedStaff.phone} &bull; Email: {selectedStaff.email}
+                          </div>
+                        </div>
+                        <div className="text-left sm:text-right">
+                          <span className="text-[10px] uppercase text-muted-foreground font-medium block">
+                            Jurisdiction
+                          </span>
+                          <span className="font-semibold text-foreground text-xs">
+                            {selectedStaffRole === "am"
+                              ? (selectedStaff as AMItem).areaName || "Assigned Area"
+                              : (selectedStaff as RMItem).regionalOfficeName || "Regional Office"}
+                          </span>
+                        </div>
+                      </div>
                     )}
                   </div>
 
-                  <div className="pt-1">
-                    <select
-                      id="behalf-order-depot-select"
-                      value={selectedDepotId}
-                      onChange={(e) => setSelectedDepotId(e.target.value)}
-                      className="w-full h-9 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary font-medium"
-                    >
-                      {officerAvailableDepots.map((depot) => (
-                        <option key={depot.id} value={depot.id}>
-                          {depot.name} ({depot.code}) - {depot.location}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                  {/* Step 2: Customer Selection (No MPO required) */}
+                  {!selectedCustomer ? (
+                    <div className="space-y-2 rounded-lg border border-border bg-muted/10 p-4">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                          <User className="size-3.5 text-primary" />
+                          Step 2: Search & Select Customer *
+                        </Label>
+                        <span className="text-[11px] text-muted-foreground">
+                          {customers.length} total customers in system
+                        </span>
+                      </div>
+
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          autoFocus
+                          placeholder="Search customer by name, shop name, phone, or customer code..."
+                          value={customerSearchQuery}
+                          onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                          className="pl-9 text-xs"
+                        />
+
+                        {/* Autocomplete Dropdown */}
+                        {customerSearchQuery.trim() && (
+                          <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-y-auto rounded-lg border border-border bg-card shadow-xl">
+                            {matchingSearchCustomers.length === 0 ? (
+                              <div className="p-4 text-center text-xs text-muted-foreground">
+                                No customer found matching &ldquo;{customerSearchQuery}&rdquo;.
+                              </div>
+                            ) : (
+                              matchingSearchCustomers.map((cust) => (
+                                <button
+                                  key={cust.id}
+                                  type="button"
+                                  onClick={() => handleSelectCustomer(cust)}
+                                  className="w-full flex items-center justify-between p-3 text-left text-xs transition-colors hover:bg-muted/50 border-b border-border/50 last:border-0 cursor-pointer"
+                                >
+                                  <div>
+                                    <div className="font-bold text-foreground text-xs">{cust.name}</div>
+                                    <div className="text-muted-foreground flex items-center gap-1.5 mt-0.5 text-[11px]">
+                                      <Store className="size-3 text-muted-foreground" />
+                                      <span className="font-semibold text-foreground">{cust.shopName}</span>
+                                      <span>&bull;</span>
+                                      <span className="font-mono text-primary font-medium">{cust.code}</span>
+                                    </div>
+                                    <div className="text-muted-foreground text-[10px] mt-0.5">
+                                      {cust.phone} &bull; {cust.address}
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-[10px] text-muted-foreground uppercase font-medium block">
+                                      Outstanding
+                                    </span>
+                                    <span className="font-bold text-amber-700 dark:text-amber-400 font-mono text-xs">
+                                      ৳ {(cust.outstandingBalance || 0).toLocaleString()}
+                                    </span>
+                                  </div>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Customer Selected Snapshot Banner with Complete Hierarchy Info */
+                    <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3 text-xs">
+                      <div className="flex items-center justify-between border-b border-primary/10 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/20 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                            <CheckCircle2 className="size-3.5 text-primary" />
+                            Customer Selected
+                          </span>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleResetCustomer}
+                          className="h-7 text-xs text-muted-foreground hover:text-foreground hover:bg-primary/10 flex items-center gap-1 cursor-pointer"
+                        >
+                          <RefreshCw className="size-3" />
+                          <span>Change Customer</span>
+                        </Button>
+                      </div>
+
+                      {/* Hierarchy Metadata Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        <div>
+                          <span className="text-muted-foreground block uppercase font-medium text-[10px]">
+                            Customer & Shop
+                          </span>
+                          <span className="font-bold text-foreground text-xs mt-0.5 block">
+                            {selectedCustomer.shopName}
+                          </span>
+                          <span className="text-muted-foreground text-[11px]">
+                            Proprietor: <strong className="text-foreground">{selectedCustomer.name}</strong> (
+                            <span className="font-mono text-primary">{selectedCustomer.code}</span>)
+                          </span>
+                          <span className="text-muted-foreground text-[10px] block mt-0.5 font-mono">
+                            {selectedCustomer.phone}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-muted-foreground block uppercase font-medium text-[10px]">
+                            Territory & Area
+                          </span>
+                          <span className="font-semibold text-foreground text-xs mt-0.5 block">
+                            Territory: {selectedCustomer.territoryName || "Assigned Territory"}
+                          </span>
+                          <span className="text-muted-foreground text-[11px] block">
+                            Area: <strong className="text-foreground">{selectedCustomer.areaName || "-"}</strong>
+                          </span>
+                          <span className="text-muted-foreground text-[10px] block mt-0.5 truncate">
+                            {selectedCustomer.address}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-muted-foreground block uppercase font-medium text-[10px]">
+                            AM, RM & Current MPO
+                          </span>
+                          <span className="text-[11px] text-muted-foreground block mt-0.5">
+                            AM: <strong className="text-foreground">{selectedCustomer.amName || "-"}</strong>
+                          </span>
+                          <span className="text-[11px] text-muted-foreground block">
+                            RM: <strong className="text-foreground">{selectedCustomer.rmName || "-"}</strong>
+                          </span>
+                          <div className="mt-1 pt-1 border-t border-primary/10 flex items-center gap-1 text-[11px]">
+                            <span className="text-muted-foreground">Current MPO:</span>
+                            {currentTerritoryMPO ? (
+                              <span className="font-semibold text-foreground">
+                                {currentTerritoryMPO.name} ({currentTerritoryMPO.code})
+                              </span>
+                            ) : (
+                              <span className="font-semibold text-amber-700 dark:text-amber-400">
+                                Unassigned
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step 3: Fulfillment Depot Selection for AM/RM */}
+                  {selectedCustomer && (
+                    <div className="rounded-lg border border-border bg-card p-4 space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                        <div>
+                          <Label htmlFor="behalf-order-depot-select" className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                            <Building2 className="size-3.5 text-primary" />
+                            Fulfillment Depot *
+                          </Label>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                            Fulfillment depot valid for {selectedCustomer.rmName || "RM"} connected depots.
+                          </p>
+                        </div>
+                        {availableDepotsForOrder.length > 1 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2.5 py-0.5 text-[10px] font-semibold text-primary w-fit">
+                            {availableDepotsForOrder.length} Connected Depots
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-muted border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground w-fit">
+                            Primary Connected Depot
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="pt-1">
+                        <select
+                          id="behalf-order-depot-select"
+                          value={selectedDepotId}
+                          onChange={(e) => setSelectedDepotId(e.target.value)}
+                          className="w-full h-9 rounded-md border border-border bg-background px-3 text-xs text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary font-medium"
+                        >
+                          {availableDepotsForOrder.map((depot) => (
+                            <option key={depot.id} value={depot.id}>
+                              {depot.name} ({depot.code}) - {depot.location}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Step 4: Product Search & Dynamic Order Line Items */}
@@ -2165,10 +2654,16 @@ export default function OrdersPage() {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={isSubmitting || !selectedOfficer || !selectedCustomer || calculatedNewOrder.items.length === 0}
+                  disabled={
+                    isSubmitting ||
+                    (orderTakenBy === "MPO" && !selectedOfficer) ||
+                    (orderTakenBy === "AM/RM" && !selectedStaff) ||
+                    !selectedCustomer ||
+                    calculatedNewOrder.items.length === 0
+                  }
                   className="cursor-pointer bg-primary text-primary-foreground font-medium hover:bg-primary/90 shadow-xs"
                 >
-                  <span>Submit Order on Behalf of MPO</span>
+                  <span>Submit Order on Behalf</span>
                 </Button>
               </div>
             </form>

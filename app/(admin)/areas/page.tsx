@@ -26,6 +26,9 @@ import { type AreaItem } from "@/lib/mock-data"
 
 export default function AreasPage() {
   const {
+    currentRole,
+    currentRM,
+    currentAM,
     areas,
     territories,
     regionalOffices,
@@ -54,9 +57,20 @@ export default function AreasPage() {
   const [formError, setFormError] = React.useState("")
   const [toastMessage, setToastMessage] = React.useState<string | null>(null)
 
+  // Base areas based on role
+  const roleBaseAreas = React.useMemo(() => {
+    if (currentRole === "rm" && currentRM) {
+      return areas.filter((a) => a.regionalOfficeId === currentRM.regionalOfficeId)
+    }
+    if (currentRole === "am" && currentAM) {
+      return areas.filter((a) => a.id === currentAM.areaId)
+    }
+    return areas
+  }, [areas, currentRole, currentRM, currentAM])
+
   // Filtered areas
   const filteredAreas = React.useMemo(() => {
-    return areas.filter((a) => {
+    return roleBaseAreas.filter((a) => {
       const q = searchQuery.toLowerCase().trim()
       const matchesSearch =
         !q ||
@@ -65,11 +79,14 @@ export default function AreasPage() {
         (a.regionalOfficeName && a.regionalOfficeName.toLowerCase().includes(q))
 
       const matchesRO =
-        selectedROFilter === "all" || a.regionalOfficeId === selectedROFilter
+        currentRole === "rm" ||
+        currentRole === "am" ||
+        selectedROFilter === "all" ||
+        a.regionalOfficeId === selectedROFilter
 
       return matchesSearch && matchesRO
     })
-  }, [areas, searchQuery, selectedROFilter])
+  }, [roleBaseAreas, searchQuery, selectedROFilter, currentRole])
 
   const showToast = (msg: string) => {
     setToastMessage(msg)
@@ -188,20 +205,24 @@ export default function AreasPage() {
             Areas
           </h2>
           <p className="text-xs text-muted-foreground">
-            Total Areas: <span className="font-semibold text-foreground">{areas.length}</span> across Regional Offices
+            {currentRole === "rm" && currentRM
+              ? `Supervised Regional Office: ${currentRM.regionalOfficeName || currentRM.areaName} (${currentRM.name})`
+              : "Manage Areas, connect them to Regional Offices and assign dedicated AMs."}
           </p>
         </div>
 
-        {/* Add Area Button */}
-        <Button
-          type="button"
-          onClick={handleOpenCreate}
-          size="sm"
-          className="cursor-pointer gap-1.5 font-medium shadow-xs"
-        >
-          <Plus className="size-4" />
-          <span>Add Area</span>
-        </Button>
+        {/* Add Area Button (Admin Only) */}
+        {currentRole === "admin" && (
+          <Button
+            type="button"
+            onClick={handleOpenCreate}
+            size="sm"
+            className="cursor-pointer gap-1.5 font-medium shadow-xs"
+          >
+            <Plus className="size-4" />
+            <span>Add Area</span>
+          </Button>
+        )}
       </div>
 
       {/* Main Table Card with Search & Regional Office Filter */}
@@ -214,22 +235,24 @@ export default function AreasPage() {
 
             {/* Filter Controls: Regional Office Select & Search Bar */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              {/* Regional Office Filter Dropdown */}
-              <div className="flex items-center gap-1.5">
-                <Filter className="size-3.5 text-muted-foreground" />
-                <select
-                  value={selectedROFilter}
-                  onChange={(e) => setSelectedROFilter(e.target.value)}
-                  className="h-8 rounded-none border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
-                >
-                  <option value="all">All Regional Offices</option>
-                  {regionalOffices.map((ro) => (
-                    <option key={ro.id} value={ro.id}>
-                      {ro.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Regional Office Filter Dropdown (Admin Only) */}
+              {currentRole === "admin" && (
+                <div className="flex items-center gap-1.5">
+                  <Filter className="size-3.5 text-muted-foreground" />
+                  <select
+                    value={selectedROFilter}
+                    onChange={(e) => setSelectedROFilter(e.target.value)}
+                    className="h-8 rounded-none border border-input bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="all">All Regional Offices</option>
+                    {regionalOffices.map((ro) => (
+                      <option key={ro.id} value={ro.id}>
+                        {ro.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Quick Search */}
               <div className="relative w-full sm:w-64">
@@ -272,9 +295,11 @@ export default function AreasPage() {
                   <th scope="col" className="px-4 py-3">
                     Territories
                   </th>
-                  <th scope="col" className="w-32 px-4 py-3 text-right">
-                    Actions
-                  </th>
+                  {currentRole === "admin" && (
+                    <th scope="col" className="w-32 px-4 py-3 text-right">
+                      Actions
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
@@ -345,41 +370,43 @@ export default function AreasPage() {
                           </span>
                         </td>
 
-                        {/* Actions: Edit / Delete */}
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {/* Edit Button */}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={() => handleOpenEdit(area)}
-                              aria-label={`Edit ${area.name}`}
-                              className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                            >
-                              <Pencil className="size-3.5" />
-                            </Button>
+                        {/* Actions: Edit / Delete (Admin Only) */}
+                        {currentRole === "admin" && (
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {/* Edit Button */}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => handleOpenEdit(area)}
+                                aria-label={`Edit ${area.name}`}
+                                className="cursor-pointer text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                              >
+                                <Pencil className="size-3.5" />
+                              </Button>
 
-                            {/* Delete Button */}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={() => setDeletingArea(area)}
-                              aria-label={`Delete ${area.name}`}
-                              className="cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                            >
-                              <Trash2 className="size-3.5" />
-                            </Button>
-                          </div>
-                        </td>
+                              {/* Delete Button */}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => setDeletingArea(area)}
+                                aria-label={`Delete ${area.name}`}
+                                className="cursor-pointer text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              >
+                                <Trash2 className="size-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     )
                   })
                 ) : (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={currentRole === "admin" ? 8 : 7}
                       className="px-4 py-8 text-center text-xs text-muted-foreground"
                     >
                       No areas found.

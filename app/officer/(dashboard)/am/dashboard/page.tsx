@@ -147,30 +147,6 @@ export default function AMDashboardPage() {
             Supervising Area: <strong className="text-foreground">{am.areaName}</strong> &bull; Regional Manager: <strong className="text-foreground">{am.rmName}</strong> &bull; Reporting Officers: <strong className="text-foreground">{amOfficers.length}</strong>
           </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <Link href="/officers">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="cursor-pointer gap-1.5 font-medium shadow-xs"
-            >
-              <UserCheck className="size-4 text-primary" />
-              <span>MPOs</span>
-            </Button>
-          </Link>
-          <Link href="/orders">
-            <Button
-              type="button"
-              size="sm"
-              className="cursor-pointer gap-1.5 bg-primary text-primary-foreground font-medium shadow-xs hover:bg-primary/90"
-            >
-              <ShoppingCart className="size-4" />
-              <span>Area Orders</span>
-            </Button>
-          </Link>
-        </div>
       </div>
 
       {/* 4 Core Summary KPI Cards */}
@@ -292,7 +268,7 @@ export default function AMDashboardPage() {
             <div className="rounded border border-border/70 bg-muted/20 px-3 py-2 space-y-0.5">
               <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
                 <MapPin className="size-3 text-muted-foreground" />
-                Assigned Territory Area
+                Area
               </span>
               <p className="text-xs font-semibold text-foreground">
                 {am.areaName}

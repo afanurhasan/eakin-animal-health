@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAppState } from "@/lib/store"
+import { getLocalTodayDateString } from "@/lib/utils"
 import {
   type SalesOfficerItem,
   type AMItem,
@@ -74,6 +75,8 @@ export default function SalesOfficersPage() {
     phone: "",
     pin: "123456",
     email: "",
+    joiningDate: getLocalTodayDateString(),
+    resignationDate: "",
     areaId: areas[0]?.id || "area-1",
     territoryId: territories[0]?.id || "ter-1",
     rmId: rms[0]?.id || "rm-1",
@@ -130,9 +133,23 @@ export default function SalesOfficersPage() {
 
   // Dependent Territories for the Filter Bar
   const availableTerritoriesForFilter = React.useMemo(() => {
+    if (currentRole === "am" && currentAM) {
+      return territories.filter(
+        (t) =>
+          t.areaId === currentAM.areaId ||
+          (currentAM.areaName && t.areaName?.toLowerCase() === currentAM.areaName?.toLowerCase())
+      )
+    }
+    if (currentRole === "rm" && currentRM) {
+      return territories.filter((t) => {
+        const territoryArea = areas.find((a) => a.id === t.areaId)
+        const roId = t.regionalOfficeId || territoryArea?.regionalOfficeId
+        return roId === currentRM.regionalOfficeId || t.areaId === currentRM.areaId
+      })
+    }
     if (selectedAreaFilter === "all") return territories
     return territories.filter((t) => t.areaId === selectedAreaFilter)
-  }, [territories, selectedAreaFilter])
+  }, [territories, selectedAreaFilter, currentRole, currentAM, currentRM, areas])
 
   // Reset filter selections if parent filter changes
   React.useEffect(() => {
@@ -170,9 +187,13 @@ export default function SalesOfficersPage() {
 
       if (!matchesSearch) return false
 
+      // Enforce territory filter for all roles
+      if (selectedTerritoryFilter !== "all" && off.territoryId !== selectedTerritoryFilter) {
+        return false
+      }
+
       if (currentRole === "admin") {
         if (selectedAreaFilter !== "all" && off.areaId !== selectedAreaFilter) return false
-        if (selectedTerritoryFilter !== "all" && off.territoryId !== selectedTerritoryFilter) return false
         if (selectedRMFilter !== "all" && off.rmId !== selectedRMFilter) return false
         if (selectedAMFilter !== "all" && off.amId !== selectedAMFilter) return false
       } else if (currentRole === "rm") {
@@ -185,8 +206,9 @@ export default function SalesOfficersPage() {
 
   // Target AM for the form
   const targetFormAM = React.useMemo(() => {
+    if (currentRole === "am" && currentAM) return currentAM
     return ams.find((a) => a.id === formData.amId) || ams[0] || null
-  }, [ams, formData.amId])
+  }, [ams, formData.amId, currentRole, currentAM])
 
   // Automatically matched Area for the form based on targetFormAM's Area
   const targetFormArea = React.useMemo(() => {
@@ -196,9 +218,16 @@ export default function SalesOfficersPage() {
 
   // Available Territories for the form based on targetFormAM's Area
   const availableTerritoriesForForm = React.useMemo(() => {
+    if (currentRole === "am" && currentAM) {
+      return territories.filter(
+        (t) =>
+          t.areaId === currentAM.areaId ||
+          (currentAM.areaName && t.areaName?.toLowerCase() === currentAM.areaName?.toLowerCase())
+      )
+    }
     if (!targetFormArea) return territories
     return territories.filter((t) => t.areaId === targetFormArea.id)
-  }, [territories, targetFormArea])
+  }, [territories, targetFormArea, currentRole, currentAM])
 
   // Automatically matched Territory for the form
   const targetFormTerritory = React.useMemo(() => {
@@ -232,13 +261,17 @@ export default function SalesOfficersPage() {
   // Open Create Modal
   const handleOpenCreate = () => {
     const nextCodeNumber = officers.length + 1
-    const defaultAM = ams[0]
+    const defaultAM = currentRole === "am" && currentAM ? currentAM : ams[0]
     const matchedArea = areas.find((a) => a.id === defaultAM?.areaId)
     const matchedRM =
       rms.find((r) => r.id === defaultAM?.rmId) ||
       rms.find((r) => r.regionalOfficeId === matchedArea?.regionalOfficeId) ||
       rms[0]
-    const matchedTerritories = territories.filter((t) => t.areaId === matchedArea?.id)
+    const matchedTerritories = territories.filter(
+      (t) =>
+        t.areaId === matchedArea?.id ||
+        (matchedArea?.name && t.areaName?.toLowerCase() === matchedArea.name.toLowerCase())
+    )
 
     setFormData({
       code: `MPO-${String(nextCodeNumber).padStart(3, "0")}`,
@@ -246,6 +279,8 @@ export default function SalesOfficersPage() {
       phone: "",
       pin: "123456",
       email: "",
+      joiningDate: getLocalTodayDateString(),
+      resignationDate: "",
       amId: defaultAM?.id || "am-1",
       areaId: defaultAM?.areaId || "area-1",
       territoryId: matchedTerritories[0]?.id || "",
@@ -267,6 +302,8 @@ export default function SalesOfficersPage() {
       phone: off.phone,
       pin: off.pin || "123456",
       email: off.email || "",
+      joiningDate: off.joiningDate || getLocalTodayDateString(),
+      resignationDate: off.resignationDate || "",
       amId: off.amId || matchedAM?.id || "am-1",
       areaId: off.areaId,
       territoryId: off.territoryId || "",
@@ -347,6 +384,8 @@ export default function SalesOfficersPage() {
         phone: formData.phone.trim(),
         pin: formData.pin.trim(),
         email: formData.email.trim(),
+        joiningDate: formData.joiningDate.trim(),
+        resignationDate: formData.resignationDate.trim(),
         areaId,
         areaName,
         territoryId,
@@ -365,6 +404,8 @@ export default function SalesOfficersPage() {
         phone: formData.phone.trim(),
         pin: formData.pin.trim() || "123456",
         email: formData.email.trim(),
+        joiningDate: formData.joiningDate.trim() || getLocalTodayDateString(),
+        resignationDate: formData.resignationDate.trim(),
         areaId,
         areaName,
         territoryId,
@@ -847,6 +888,44 @@ export default function SalesOfficersPage() {
                 )}
               </div>
 
+              {/* Joining Date & Resignation Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="officerJoiningDate" className="text-xs font-medium text-foreground">
+                    Joining Date
+                  </Label>
+                  <Input
+                    id="officerJoiningDate"
+                    name="officerJoiningDate"
+                    type="date"
+                    value={formData.joiningDate}
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, joiningDate: e.target.value }))
+                    }}
+                    className="text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="officerResignationDate" className="text-xs font-medium text-foreground">
+                    Resignation Date
+                  </Label>
+                  <Input
+                    id="officerResignationDate"
+                    name="officerResignationDate"
+                    type="date"
+                    value={formData.resignationDate}
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, resignationDate: e.target.value }))
+                    }}
+                    className="text-xs"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Leave empty for active MPO.
+                  </p>
+                </div>
+              </div>
+
               {/* Assigned Area Manager (AM) */}
               <div className="space-y-1.5">
                 <Label htmlFor="officerAM" className="text-xs font-medium text-foreground">
@@ -874,13 +953,24 @@ export default function SalesOfficersPage() {
                     if (formErrors.amId) setFormErrors((prev) => ({ ...prev, amId: undefined }))
                     if (formErrors.territoryId) setFormErrors((prev) => ({ ...prev, territoryId: undefined }))
                   }}
-                  className={`h-8 w-full rounded border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring ${formErrors.amId ? "border-destructive focus:ring-destructive" : "border-input"}`}
+                  disabled={currentRole === "am"}
+                  className={`h-8 w-full rounded border bg-background px-2.5 py-1 text-xs text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring ${
+                    formErrors.amId ? "border-destructive focus:ring-destructive" : "border-input"
+                  } ${currentRole === "am" ? "opacity-80 cursor-not-allowed bg-muted/40" : ""}`}
                 >
-                  {ams.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name} ({a.code}) — Area: {a.areaName}
-                    </option>
-                  ))}
+                  {ams
+                    .filter((a) => {
+                      if (currentRole === "am" && currentAM) return a.id === currentAM.id
+                      if (currentRole === "rm" && currentRM) {
+                        return a.rmId === currentRM.id || a.areaId === currentRM.areaId
+                      }
+                      return true
+                    })
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.code}) — Area: {a.areaName}
+                      </option>
+                    ))}
                 </select>
                 {formErrors.amId && (
                   <p className="text-[11px] text-destructive">{formErrors.amId}</p>

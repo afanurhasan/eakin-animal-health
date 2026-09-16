@@ -18,6 +18,7 @@ import {
   Clock,
   X,
   Building2,
+  Calendar,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -31,6 +32,7 @@ import {
   type Order,
 } from "@/lib/mock-data"
 import { useAppState } from "@/lib/store"
+import { formatDate } from "@/lib/utils"
 
 export default function MPODetailPage() {
   const params = useParams()
@@ -123,6 +125,29 @@ export default function MPODetailPage() {
                   </span>
                 </div>
               </div>
+            </div>
+
+            {/* Employment Status & Dates (Top-right Box) */}
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end shrink-0">
+              {/* Normally Join Date is always displayed */}
+              <div className="flex items-center gap-1.5 rounded-md border border-border/80 bg-muted/20 px-3 py-1.5 text-xs">
+                <Calendar className="size-3.5 text-primary" />
+                <span className="text-muted-foreground font-medium">Join Date:</span>
+                <span className="font-semibold text-foreground font-mono">
+                  {formatDate(officer.joiningDate || "2026-09-16")}
+                </span>
+              </div>
+
+              {/* If resigned, also show Resign Date */}
+              {officer.resignationDate && officer.resignationDate.trim() ? (
+                <div className="flex items-center gap-1.5 rounded-md border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs text-rose-700 dark:text-rose-400">
+                  <Calendar className="size-3.5 text-rose-600 dark:text-rose-400" />
+                  <span className="font-semibold">Resign Date:</span>
+                  <span className="font-bold font-mono">
+                    {formatDate(officer.resignationDate)}
+                  </span>
+                </div>
+              ) : null}
             </div>
           </div>
 

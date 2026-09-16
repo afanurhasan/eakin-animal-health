@@ -15,6 +15,7 @@ import {
   MapPin,
   Building2,
   Info,
+  Calendar,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -22,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { useAppState } from "@/lib/store"
+import { formatDate } from "@/lib/utils"
 
 export default function StaffProfilePage() {
   const { currentRole, currentOfficer, currentAM, currentRM, verifyAndChangePin } = useAppState()
@@ -240,6 +242,18 @@ export default function StaffProfilePage() {
                   </span>
                   <span className="text-foreground text-right font-medium max-w-[160px] truncate">{user.parentSupervisor}</span>
                 </div>
+
+                {currentOfficer && (
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="size-3.5 text-muted-foreground" />
+                      <span>Join Date:</span>
+                    </span>
+                    <strong className="font-mono font-medium text-foreground">
+                      {formatDate(currentOfficer.joiningDate || "2026-09-16")}
+                    </strong>
+                  </div>
+                )}
               </div>
 
               {/* Login Credential Summary Badge */}
